@@ -7,3 +7,5 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: '1057844666125',
   appId: '1:1057844666125:web:8e1755b3953607155d9a44',
 };
+// App Check（reCAPTCHA Enterprise）網站金鑰：公開的，用來證明請求真的來自這個遊戲，擋掉機器人
+window.RECAPTCHA_SITE_KEY = '6LeSK_AtAAAAAB-zDVJAY-pGu6m24O5vP1iJWMe5';

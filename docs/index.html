@@ -111,6 +111,9 @@
     border: 2px solid rgba(255,158,192,.4); background: rgba(0,0,0,.35); color: #fff; text-align: center;
     user-select: text; -webkit-user-select: text; touch-action: auto; }
   .field:focus { outline: none; border-color: var(--gold); }
+  .grecaptcha-badge { visibility: hidden; } /* 不擋畫面；改在雲端存檔頁面放文字說明 */
+  .legal { font-size: 11px; color: rgba(255,255,255,.4); margin: 0; }
+  .legal a { color: inherit; }
   #shop-list, #stage-list { margin: 0 auto; }
 
   /* 橫屏：按鈕排成一排、商店每個項目是一整行（圖示｜說明｜按鈕） */
@@ -192,6 +195,7 @@
     <p class="stat" id="restore-msg"></p>
   </div>
   <button class="btn ghost" id="btn-cloud-back">返回</button>
+  <p class="legal">雲端存檔受 reCAPTCHA 保護，適用 Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">隱私權政策</a>與<a href="https://policies.google.com/terms" target="_blank" rel="noopener">服務條款</a>。</p>
 </div>
 
 <div id="stages" class="screen hidden">
@@ -373,7 +377,12 @@ async function cloudInit() {
   try {
     const app = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`);
     const fs = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`);
-    CLOUD.api = fs; CLOUD.db = fs.getFirestore(app.initializeApp(cfg)); CLOUD.ready = true; CLOUD.state = 'syncing';
+    const fbApp = app.initializeApp(cfg);
+    if (window.RECAPTCHA_SITE_KEY) {
+      const ac = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app-check.js`);
+      CLOUD.appCheck = ac.initializeAppCheck(fbApp, { provider: new ac.ReCaptchaEnterpriseProvider(window.RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true }); CLOUD.acApi = ac;
+    }
+    CLOUD.api = fs; CLOUD.db = fs.getFirestore(fbApp); CLOUD.ready = true; CLOUD.state = 'syncing';
     await cloudSync();
     if (CLOUD.state === 'syncing') CLOUD.state = 'ok'; // 還沒取暱稱時沒有東西要同步
   } catch (e) { CLOUD.state = 'offline'; }

@@ -66,7 +66,12 @@ if (!cfg || !cfg.apiKey) {
   const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
   const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
   const { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
-  const app = initializeApp(cfg), auth = getAuth(app), db = getFirestore(app);
+  const app = initializeApp(cfg);
+  if (window.RECAPTCHA_SITE_KEY) {
+    const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app-check.js`);
+    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(window.RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
+  }
+  const auth = getAuth(app), db = getFirestore(app);
 
   $('login').onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(e => { $('msg').textContent = '登入失敗：' + e.message; });
   $('logout').onclick = () => signOut(auth);
