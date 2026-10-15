@@ -19,7 +19,7 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
     font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
     touch-action: none; user-select: none; -webkit-user-select: none; }
-  canvas { display: block; position: fixed; inset: 0; }
+  canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
   .hidden { display: none !important; }
 
   #hud { position: fixed; inset: 0; pointer-events: none;
@@ -430,6 +430,8 @@ function resize() {
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = innerWidth; H = innerHeight; S = Math.min(W, H);
   cv.width = W * DPR; cv.height = H * DPR;
+  // 畫布在螢幕上的大小固定為視窗大小；高解析度手機（DPR 2～3）才不會被放大、點擊位置才會對
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   spriteCache.clear();
   artCache.clear();
