@@ -164,6 +164,7 @@
   <button class="btn ghost" id="btn-cloud">☁️ 雲端存檔</button>
   </div>
   <p class="stat hint" style="max-width:300px">滑動手指切水果！不要切到 💣<br>每關打倒 5 隻 Boss 就能解鎖下一關</p>
+  <div id="daily" class="badge hidden"></div>
   <div id="version"></div>
 </div>
 
@@ -266,25 +267,25 @@ const FRUITS = [
 
 // finisher：打倒 Boss 時的專屬擊殺技名稱
 const BLADES = [
-  { id: 'basic', name: '基本小刀', icon: '🔪', price: 0, power: 1, colors: ['#ffffff', '#dfe7ff'], finisher: '千刃斬',
+  { id: 'basic', name: '基本小刀', icon: '🔪', price: 0, req: 1, power: 1, colors: ['#ffffff', '#dfe7ff'], finisher: '千刃斬',
     desc: '樸實無華的刀。擊殺技：瞬間斬出無數刀光。' },
-  { id: 'fire', name: '烈焰刀', icon: '🔥', price: 200, power: 1.3, colors: ['#fff3b0', '#ff9f1c', '#ff4d00'], finisher: '爆炎火柱',
+  { id: 'fire', name: '烈焰刀', icon: '🔥', price: 300, req: 1, power: 1.3, colors: ['#fff3b0', '#ff9f1c', '#ff4d00'], finisher: '爆炎火柱',
     desc: '切到水果會爆炸，燒掉附近的水果。Boss 會持續燃燒。' },
-  { id: 'ice', name: '冰霜刀', icon: '❄️', price: 400, power: 1.2, colors: ['#ffffff', '#a8e6ff', '#3fa7d6'], finisher: '絕對零度',
+  { id: 'ice', name: '冰霜刀', icon: '❄️', price: 800, req: 1, power: 1.2, colors: ['#ffffff', '#a8e6ff', '#3fa7d6'], finisher: '絕對零度',
     desc: '有機率讓時間變慢。Boss 會被凍住變慢。' },
-  { id: 'sakura', name: '櫻花刀', icon: '🌸', price: 600, power: 1.3, colors: ['#ffffff', '#ffc8dd', '#ff8fab'], finisher: '千本櫻',
+  { id: 'sakura', name: '櫻花刀', icon: '🌸', price: 1800, req: 2, power: 1.3, colors: ['#ffffff', '#ffc8dd', '#ff8fab'], finisher: '千本櫻',
     desc: '切水果會飄出櫻花瓣，花瓣會自動追蹤並切開其他水果。' },
-  { id: 'thunder', name: '雷霆刀', icon: '⚡', price: 800, power: 1.5, colors: ['#ffffff', '#fff3a0', '#ffd60a'], finisher: '雷神降臨',
+  { id: 'thunder', name: '雷霆刀', icon: '⚡', price: 3500, req: 2, power: 1.5, colors: ['#ffffff', '#fff3a0', '#ffd60a'], finisher: '雷神降臨',
     desc: '閃電會連鎖劈中附近的水果。砍 Boss 有機率落雷。' },
-  { id: 'wind', name: '疾風刀', icon: '🌪️', price: 1000, power: 1.4, colors: ['#ffffff', '#c7f9cc', '#57cc99'], finisher: '風神一閃',
+  { id: 'wind', name: '疾風刀', icon: '🌪️', price: 6000, req: 3, power: 1.4, colors: ['#ffffff', '#c7f9cc', '#57cc99'], finisher: '風神一閃',
     desc: '刀氣範圍變大，更容易切到水果。砍 Boss 有機率連擊。' },
-  { id: 'shadow', name: '暗影刀', icon: '🌑', price: 1300, power: 1.6, colors: ['#f3e8ff', '#9d4edd', '#3c096c'], finisher: '影殺',
+  { id: 'shadow', name: '暗影刀', icon: '🌑', price: 9000, req: 3, power: 1.6, colors: ['#f3e8ff', '#9d4edd', '#3c096c'], finisher: '影殺',
     desc: '有機率召喚影子分身，同時斬殺畫面上另一顆水果。' },
-  { id: 'love', name: '愛心彩虹刀', icon: '💖', price: 1600, power: 1.8, rainbow: true, colors: ['#ff5c8a'], finisher: '愛的告白',
-    desc: '彩虹刀光、金幣加倍，有機率回復愛心。' },
-  { id: 'galaxy', name: '星河刀', icon: '🌌', price: 2000, power: 2.0, colors: ['#ffffff', '#a0c4ff', '#7b2cbf', '#3a0ca3'], finisher: '星河隕落',
-    desc: '金幣加倍，切水果有機率掉下金色星星。砍 Boss 有機率召喚隕石。' },
-  { id: 'dragon', name: '龍神刀', icon: '🐉', price: 2800, power: 2.5, colors: ['#fff3b0', '#ffd60a', '#e85d04', '#9d0208'], finisher: '龍神降臨',
+  { id: 'love', name: '愛心彩虹刀', icon: '💖', price: 14000, req: 4, power: 1.8, rainbow: true, colors: ['#ff5c8a'], finisher: '愛的告白',
+    desc: '彩虹刀光、金幣 +25%，有機率回復愛心。' },
+  { id: 'galaxy', name: '星河刀', icon: '🌌', price: 20000, req: 5, power: 2.0, colors: ['#ffffff', '#a0c4ff', '#7b2cbf', '#3a0ca3'], finisher: '星河隕落',
+    desc: '金幣 +50%，切水果有機率掉下金色星星。砍 Boss 有機率召喚隕石。' },
+  { id: 'dragon', name: '龍神刀', icon: '🐉', price: 30000, req: 6, power: 2.5, colors: ['#fff3b0', '#ffd60a', '#e85d04', '#9d0208'], finisher: '龍神降臨',
     desc: '最強之刀。有機率召喚龍息，橫掃整排水果。' },
 ];
 
@@ -335,24 +336,24 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.4.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
+const VERSION = '1.5.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
 
 // 能力強化：用金幣永久升級（跟刀分開）
 const PERKS = [
-  { id: 'coin', icon: '💰', name: '金幣加成', max: 5, base: 150, desc: l => `獲得的金幣 +${20 * l}%` },
-  { id: 'heart', icon: '💗', name: '愛心出現率', max: 5, base: 200, desc: l => `補血愛心出現率 ${(1.5 + l).toFixed(1)}%` },
-  { id: 'bomb', icon: '💣', name: '炸彈減少', max: 5, base: 250, desc: l => `炸彈出現機率 -${8 * l}%` },
-  { id: 'star', icon: '🌟', name: '金星出現率', max: 5, base: 180, desc: l => `金星出現率 ${(3 + 1.2 * l).toFixed(1)}%` },
-  { id: 'life', icon: '❤️', name: '起始愛心', max: 2, base: 600, desc: l => `開局愛心 ${START_HEARTS + l} 顆` },
+  { id: 'coin', icon: '💰', name: '金幣加成', max: 5, base: 300, desc: l => `獲得的金幣 +${8 * l}%` },
+  { id: 'heart', icon: '💗', name: '愛心出現率', max: 5, base: 400, desc: l => `補血愛心出現率 ${(1.5 + l).toFixed(1)}%` },
+  { id: 'bomb', icon: '💣', name: '炸彈減少', max: 5, base: 500, desc: l => `炸彈出現機率 -${8 * l}%` },
+  { id: 'star', icon: '🌟', name: '金星出現率', max: 5, base: 350, desc: l => `金星出現率 ${(3 + 1.2 * l).toFixed(1)}%` },
+  { id: 'life', icon: '❤️', name: '起始愛心', max: 2, base: 2000, desc: l => `開局愛心 ${START_HEARTS + l} 顆` },
 ];
 const perkLvl = id => (save.perks && save.perks[id]) || 0;
-const perkCost = (p, lvl) => Math.round(p.base * (lvl + 1) * (1 + lvl * 0.5));
+const perkCost = (p, lvl) => Math.round(p.base * Math.pow(1.8, lvl)); // 每升一級貴 1.8 倍
 const HIT_RADIUS = 0.6; // 判定半徑（相對水果圖示半徑）
 
 // ===== 存檔 =====
 const SAVE_KEY = 'fruitslash_save_v1';
 // cloud = { code: 恢復碼, name: 暱稱 }，只存在這支手機，不會上傳到 save 欄位裡
-const defaultSave = () => ({ coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null });
+const defaultSave = () => ({ coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null, bossFirst: {}, daily: null });
 let save = defaultSave();
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 function persist() {
@@ -759,9 +760,12 @@ function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e
 const blade = () => BLADES.find(b => b.id === save.equipped) || BLADES[0];
 const bladeLvl = () => save.levels[save.equipped] || 1;
 const dmgOf = (b, lvl) => +(b.power * (1 + (lvl - 1) * 0.5)).toFixed(1);
-const coinMult = () => (save.equipped === 'love' || save.equipped === 'galaxy') ? 2 : 1;
+const coinMult = () => save.equipped === 'galaxy' ? 1.5 : save.equipped === 'love' ? 1.25 : 1;
 const hitMul = () => save.equipped === 'wind' ? 1.3 + 0.12 * bladeLvl() : 1;
-const upgradeCost = (b, lvl) => Math.round(60 * lvl + b.price * 0.5 * lvl);
+const upgradeCost = (b, lvl) => Math.round((b.price * 0.3 + 60) * Math.pow(1.6, lvl - 1)); // 每升一級貴 1.6 倍
+// 刀的解鎖條件：req 1～5 = 要解鎖到第幾關，6 = 打通全部關卡
+const bladeUnlocked = b => (b.req || 1) <= save.unlocked + (save.cleared[STAGES.length - 1] ? 1 : 0);
+const reqText = b => b.req >= 6 ? '打通全部關卡後解鎖' : `通過第 ${b.req - 1} 關後解鎖`;
 function effectText(b, lvl) {
   const d = `Boss 傷害 ${dmgOf(b, lvl)}`;
   switch (b.id) {
@@ -771,8 +775,8 @@ function effectText(b, lvl) {
     case 'thunder': return `${d}・${60 + 8 * lvl}% 機率閃電連鎖 ${lvl} 個`;
     case 'wind': return `${d}・判定範圍 +${30 + 12 * lvl}%・${10 + 5 * lvl}% 機率連擊 Boss`;
     case 'shadow': return `${d}・${20 + 7 * lvl}% 機率影子分身斬`;
-    case 'love': return `${d}・金幣 ×2・${3 * lvl}% 機率回復愛心`;
-    case 'galaxy': return `${d}・金幣 ×2・${3 * lvl}% 機率掉落金星`;
+    case 'love': return `${d}・金幣 +25%・${3 * lvl}% 機率回復愛心`;
+    case 'galaxy': return `${d}・金幣 +50%・${3 * lvl}% 機率掉落金星`;
     case 'dragon': return `${d}・${5 + 2 * lvl}% 機率噴出龍息橫掃`;
     default: return d;
   }
@@ -896,7 +900,7 @@ function makeHalves(o, ang, off = 0, col = '#fff', force = 1) {
 }
 
 function addCoins(n) {
-  const v = n * (1 + 0.2 * perkLvl('coin')) + G.coinFrac, w = Math.floor(v + 1e-9);
+  const v = n * (1 + 0.08 * perkLvl('coin')) + G.coinFrac, w = Math.floor(v + 1e-9);
   G.coinFrac = v - w; save.coins += w; G.coinsEarned += w;
   return w;
 }
@@ -912,7 +916,7 @@ function hitObj(o, ang, byEffect, off = 0) {
   G.score += 1;
   addCoins(coinMult());
   G.strokeCount++;
-  if (o.kind === 'star') { const c = addCoins(10 * coinMult()); text(o.x, o.y, `+${c} 💰`, '#ffd166'); sfx.coin(); }
+  if (o.kind === 'star') { const c = addCoins(5 * coinMult()); text(o.x, o.y, `+${c} 💰`, '#ffd166'); sfx.coin(); }
   if (o.kind === 'heart') { G.hearts = Math.min(MAX_HEARTS, G.hearts + 1); text(o.x, o.y, '+❤️', '#ff5c8a'); sfx.coin(); }
   sfx.slice();
   if (!byEffect) bladeEffect(o);
@@ -1148,13 +1152,17 @@ function bombPath(b, p) {
 }
 function finishBoss() {
   const b = G.boss, i = G.bossIndex;
-  const reward = Math.round(60 * (i + 1) * (1 + G.stage * 0.5)) * coinMult();
+  // 每隻 Boss 第一次打倒給 3 倍獎勵，之後重刷只給基本額（鼓勵往後推進，不是一直刷同一關）
+  save.bossFirst = save.bossFirst || {};
+  const key = G.stage + '-' + i, first = !save.bossFirst[key];
+  save.bossFirst[key] = true;
+  const reward = Math.round(20 * (i + 1) * (1 + G.stage * 0.6) * (first ? 3 : 1) * coinMult());
   const got = addCoins(reward); G.score += 20;
   // 打倒 Boss 回復兩顆愛心
   const heal = Math.min(2, MAX_HEARTS - G.hearts);
   if (heal > 0) { G.hearts += heal; text(W / 2, H * 0.42 + S * 0.2, '+' + '❤️'.repeat(heal), '#ff5c8a', 0.07, 1.8); }
   emojiBurst(W / 2, H * 0.45, '💰', 10, S * 0.05, 0.9);
-  text(W / 2, H * 0.42, `擊敗 ${b.name}！`, '#ffd166', 0.08, 1.8);
+  text(W / 2, H * 0.42, first ? `首次擊敗 ${b.name}！獎勵 ×3` : `擊敗 ${b.name}！`, '#ffd166', 0.08, 1.8);
   text(W / 2, H * 0.42 + S * 0.1, `+${got} 💰`, '#fff', 0.07, 1.8);
   sfx.win();
   G.bossIndex++;
@@ -2138,7 +2146,7 @@ function endStroke(e) {
   activePointer = null;
   if (state === 'play' && G.strokeCount >= 3) {
     const n = G.strokeCount;
-    G.score += n; addCoins(n * coinMult());
+    G.score += n; addCoins(Math.floor(n / 2) * coinMult());
     text(lastPt.x, lastPt.y - S * 0.05, `${n} 連斬！+${n}`, '#ffd166', 0.075, 1.1);
     sfx.coin(); updateHUD();
   }
@@ -2166,12 +2174,25 @@ function updateHUD() {
 }
 function goMenu() {
   if (!save.cloud || !save.cloud.name) return openNameSet();
+  dailyReward();
   state = 'menu'; G = null;
   $('menu-title').textContent = CONFIG.title;
   $('menu-sub').textContent = `專屬 ${CONFIG.herName} 的切水果遊戲 💕`;
   $('menu-best').textContent = save.best; $('menu-coins').textContent = save.coins;
   $('boss-bar').classList.add('hidden');
   show('menu');
+}
+// 每日登入獎勵：每天第一次回到主選單時發放；連續天數越多越多（最多 7 天）
+function dailyReward() {
+  const d = new Date(), today = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  const y = new Date(d - 864e5), yesterday = `${y.getFullYear()}-${y.getMonth() + 1}-${y.getDate()}`;
+  const daily = save.daily || {};
+  if (daily.last === today) return;
+  const streak = daily.last === yesterday ? Math.min(7, (daily.streak || 0) + 1) : 1;
+  const gift = 100 + 50 * (streak - 1);
+  save.daily = { last: today, streak }; save.coins += gift; persist();
+  const el = $('daily'); el.textContent = `🎁 每日登入第 ${streak} 天：+${gift} 💰` + (streak < 7 ? `（明天 +${gift + 50}）` : '');
+  el.classList.remove('hidden'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 4500);
 }
 function openStages() { state = 'stages'; renderStages(); show('stages'); }
 function renderStages() {
@@ -2206,12 +2227,13 @@ function gameOver() {
 function stageClear() {
   state = 'clear';
   const i = G.stage;
+  const firstBonus = save.cleared[i] ? 0 : addCoins(300 * (i + 1)); // 第一次通關獎勵
   save.cleared[i] = true;
   const unlockNew = i + 1 < STAGES.length && save.unlocked < i + 2;
   if (unlockNew) save.unlocked = i + 2;
   recordScore();
   persist();
-  $('clear-stage').textContent = `${G.st.icon} ${G.st.name} 完成！`;
+  $('clear-stage').textContent = `${G.st.icon} ${G.st.name} 完成！` + (firstBonus ? `　首次通關獎勵 +${firstBonus} 💰` : '');
   $('clear-score').textContent = G.score; $('clear-coins').textContent = G.coinsEarned;
   $('clear-unlock').classList.toggle('hidden', !unlockNew);
   if (unlockNew) $('clear-unlock').textContent = `🔓 解鎖新關卡：${STAGES[i + 1].icon} ${STAGES[i + 1].name}`;
@@ -2241,7 +2263,9 @@ function renderShop() {
       <div class="actions"></div>`;
     const act = card.querySelector('.actions');
     const mk = (label, cls, disabled, fn) => { const bt = document.createElement('button'); bt.className = 'btn ' + cls; bt.textContent = label; bt.disabled = disabled; bt.onclick = () => { audio(); fn(); }; act.appendChild(bt); };
-    if (!owned) {
+    if (!owned && !bladeUnlocked(b)) {
+      mk(`🔒 ${reqText(b)}`, 'ghost', true, () => {});
+    } else if (!owned) {
       mk(`購買 💰${b.price}`, '', save.coins < b.price, () => { save.coins -= b.price; save.owned[b.id] = true; save.levels[b.id] = 1; save.equipped = b.id; persist(); sfx.win(); renderShop(); });
     } else {
       mk(eq ? '使用中' : '裝備', eq ? 'ghost' : 'alt', eq, () => { save.equipped = b.id; persist(); sfx.coin(); renderShop(); });
