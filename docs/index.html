@@ -1694,10 +1694,11 @@ function update(rdt) {
   if (G.warnT > 0) G.warnT -= rdt;
   G.spawnT -= dt;
   if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin) {
-    const diff = Math.min(1, G.score / 250);
-    G.spawnT = (1.7 - 0.8 * diff) / G.st.diff * (G.boss ? 1.8 : 1);
-    const n = 1 + Math.floor(Math.random() * (1 + diff * 3.5 + (G.st.diff - 1) * 2));
-    for (let i = 0; i < n; i++) G.pending.push({ t: i * 0.18, kind: pickKind(diff) });
+    // 難度慢慢上升（400 分才到最難）；一次最多 3 顆，最後一關最多 4 顆，而且一顆一顆錯開飛出來
+    const diff = Math.min(1, G.score / 400);
+    G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1);
+    const n = 1 + Math.floor(Math.random() * (1 + diff * 2 + (G.st.diff - 1)));
+    for (let i = 0; i < n; i++) G.pending.push({ t: i * 0.28, kind: pickKind(diff) });
   }
   for (const p of G.pending) { p.t -= dt; if (p.t <= 0) { launch(p.kind); p.done = true; } }
   G.pending = G.pending.filter(p => !p.done);
