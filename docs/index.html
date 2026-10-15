@@ -103,6 +103,23 @@
   .stage:disabled { filter: grayscale(1) brightness(.6); cursor: default; }
   #stage-hud { font-size: 13px; color: var(--muted); margin-top: 2px; }
   #clear .big-score { font-size: 56px; }
+  #checkin, #whatsnew { justify-content: safe center; overflow-y: auto; touch-action: pan-y; }
+  #checkin h2, #whatsnew h2 { margin: 0; font-size: 26px; }
+  #checkin-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; max-width: 520px; }
+  .day { background: var(--panel); border: 2px solid rgba(255,158,192,.2); border-radius: 10px; padding: 4px 2px; font-size: 11px; color: var(--muted); }
+  .day .dr { font-size: 18px; line-height: 1.2; }
+  .day .dv { color: var(--gold); font-weight: 800; }
+  .day.done { opacity: .45; }
+  .day.done .dn::after { content: ' ✓'; color: #8ac926; }
+  .day.today { border-color: var(--gold); box-shadow: 0 0 12px rgba(255,209,102,.5); color: #fff; }
+  .day.special { border-color: #fff3b0; background: linear-gradient(180deg, rgba(255,243,176,.3), var(--panel)); }
+  .wn-box ul { text-align: left; margin: 0; padding-left: 1.2em; font-size: 15px; line-height: 1.75; max-height: 55vh; overflow-y: auto; }
+  #loading { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: linear-gradient(rgba(20,8,26,.5), rgba(20,8,26,.8)), url(cover-bg.jpg) center / cover no-repeat, #14081a; transition: opacity .4s; }
+  #loading.fade { opacity: 0; }
+  .load-track { width: min(60vw, 360px); height: 12px; border-radius: 6px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,158,192,.5); overflow: hidden; }
+  #load-bar { height: 100%; width: 0; background: linear-gradient(90deg, #ff5c8a, #ffd166); transition: width .3s; }
+  @media (orientation: landscape) { #checkin-grid { grid-template-columns: repeat(10, 1fr); max-width: 900px; } }
   .btn-row { display: flex; flex-direction: column; align-items: center; gap: 14px; }
   /* 主選單封面：刀切西瓜的背景圖，上面蓋一層暗色讓文字清楚 */
   #menu { background: linear-gradient(rgba(20,8,26,.45), rgba(20,8,26,.7)), url(cover-bg.jpg) center / cover no-repeat, #14081a; }
@@ -152,6 +169,13 @@
 <body>
 <canvas id="c"></canvas>
 
+<div id="loading">
+  <h1 class="title">寶貝切切樂</h1>
+  <div class="load-track"><div id="load-bar"></div></div>
+  <p class="stat" id="load-text">載入中…</p>
+  <p class="stat" id="load-ver"></p>
+</div>
+
 <div id="hud" class="hidden">
   <div class="hud-left"><div id="score">0</div><div id="best-hud">最高 0</div><div id="stage-hud"></div></div>
   <div class="hud-right"><div id="hearts"></div><div id="coins-hud">💰 0</div><div id="blade-hud"></div></div>
@@ -167,10 +191,10 @@
   <div class="btn-row">
   <button class="btn" id="btn-play">開始遊戲</button>
   <button class="btn alt" id="btn-shop">🛒 商店</button>
+  <button class="btn ghost" id="btn-checkin-open">📅 每日簽到</button>
   <button class="btn ghost" id="btn-cloud">☁️ 雲端存檔</button>
   </div>
   <p class="stat hint" style="max-width:300px">滑動手指切水果！不要切到 💣<br>每關打倒 5 隻 Boss 就能解鎖下一關</p>
-  <div id="daily" class="badge hidden"></div>
   <div id="version"></div>
 </div>
 
@@ -203,6 +227,21 @@
   </div>
   <button class="btn ghost" id="btn-cloud-back">返回</button>
   <p class="legal">雲端存檔受 reCAPTCHA 保護，適用 Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">隱私權政策</a>與<a href="https://policies.google.com/terms" target="_blank" rel="noopener">服務條款</a>。</p>
+</div>
+
+<div id="checkin" class="screen hidden">
+  <h2>📅 每日簽到</h2>
+  <p class="stat" id="checkin-title"></p>
+  <p class="stat">累積簽到 30 天可以領取限定神刀 👼「天使之刃」！漏簽一天不會重來</p>
+  <div id="checkin-grid"></div>
+  <p class="stat" id="checkin-msg"></p>
+  <div class="btn-row"><button class="btn" id="btn-checkin">簽到</button><button class="btn ghost" id="btn-checkin-back">返回</button></div>
+</div>
+
+<div id="whatsnew" class="screen hidden">
+  <h2 id="wn-title">🎉 更新內容</h2>
+  <div class="cloud-box wn-box"><ul id="wn-list"></ul></div>
+  <button class="btn" id="btn-wn-ok">開始玩！</button>
 </div>
 
 <div id="stages" class="screen hidden">
@@ -279,20 +318,34 @@ const BLADES = [
     desc: '切到水果會爆炸，燒掉附近的水果。Boss 會持續燃燒。' },
   { id: 'ice', name: '冰霜刀', icon: '❄️', price: 800, req: 1, power: 1.2, colors: ['#ffffff', '#a8e6ff', '#3fa7d6'], finisher: '絕對零度',
     desc: '有機率讓時間變慢。Boss 會被凍住變慢。' },
-  { id: 'sakura', name: '櫻花刀', icon: '🌸', price: 1800, req: 2, power: 1.3, colors: ['#ffffff', '#ffc8dd', '#ff8fab'], finisher: '千本櫻',
+  { id: 'poison', name: '毒液刀', icon: '☠️', price: 1500, req: 2, power: 1.3, colors: ['#e9ff70', '#80ed99', '#2d6a4f'], finisher: '劇毒爆發',
+    desc: '切開的水果會留下毒霧，碰到毒霧的水果也會被溶掉。Boss 會中毒持續扣血。' },
+  { id: 'sakura', name: '櫻花刀', icon: '🌸', price: 2200, req: 2, power: 1.3, colors: ['#ffffff', '#ffc8dd', '#ff8fab'], finisher: '千本櫻',
     desc: '切水果會飄出櫻花瓣，花瓣會自動追蹤並切開其他水果。' },
-  { id: 'thunder', name: '雷霆刀', icon: '⚡', price: 3500, req: 2, power: 1.5, colors: ['#ffffff', '#fff3a0', '#ffd60a'], finisher: '雷神降臨',
+  { id: 'thunder', name: '雷霆刀', icon: '⚡', price: 3500, req: 3, power: 1.5, colors: ['#ffffff', '#fff3a0', '#ffd60a'], finisher: '雷神降臨',
     desc: '閃電會連鎖劈中附近的水果。砍 Boss 有機率落雷。' },
-  { id: 'wind', name: '疾風刀', icon: '🌪️', price: 6000, req: 3, power: 1.4, colors: ['#ffffff', '#c7f9cc', '#57cc99'], finisher: '風神一閃',
+  { id: 'water', name: '水流刀', icon: '🌊', price: 5000, req: 3, power: 1.4, colors: ['#ffffff', '#90e0ef', '#0077b6'], finisher: '怒濤海嘯',
+    desc: '刀光會化成水刃往前延伸，切開同一條線上的水果。' },
+  { id: 'wind', name: '疾風刀', icon: '🌪️', price: 6500, req: 4, power: 1.4, colors: ['#ffffff', '#c7f9cc', '#57cc99'], finisher: '風神一閃',
     desc: '刀氣範圍變大，更容易切到水果。砍 Boss 有機率連擊。' },
-  { id: 'shadow', name: '暗影刀', icon: '🌑', price: 9000, req: 3, power: 1.6, colors: ['#f3e8ff', '#9d4edd', '#3c096c'], finisher: '影殺',
+  { id: 'shadow', name: '暗影刀', icon: '🌑', price: 9000, req: 4, power: 1.6, colors: ['#f3e8ff', '#9d4edd', '#3c096c'], finisher: '影殺',
     desc: '有機率召喚影子分身，同時斬殺畫面上另一顆水果。' },
-  { id: 'love', name: '愛心彩虹刀', icon: '💖', price: 14000, req: 4, power: 1.8, rainbow: true, colors: ['#ff5c8a'], finisher: '愛的告白',
+  { id: 'gold', name: '黃金刀', icon: '🪙', price: 12000, req: 5, power: 1.6, colors: ['#fff3b0', '#ffd166', '#b8860b'], finisher: '黃金暴雨',
+    desc: '切水果有機率噴出額外金幣。砍 Boss 也有機率掉金幣。' },
+  { id: 'love', name: '愛心彩虹刀', icon: '💖', price: 15000, req: 5, power: 1.8, rainbow: true, colors: ['#ff5c8a'], finisher: '愛的告白',
     desc: '彩虹刀光、金幣 +25%，有機率回復愛心。' },
-  { id: 'galaxy', name: '星河刀', icon: '🌌', price: 20000, req: 5, power: 2.0, colors: ['#ffffff', '#a0c4ff', '#7b2cbf', '#3a0ca3'], finisher: '星河隕落',
+  { id: 'holy', name: '聖光刀', icon: '✨', price: 19000, req: 6, power: 1.9, colors: ['#ffffff', '#fff3b0', '#ffd166'], finisher: '聖光審判',
+    desc: '有機率獲得護盾，抵擋一次炸彈或漏接。砍 Boss 有機率降下光柱。' },
+  { id: 'galaxy', name: '星河刀', icon: '🌌', price: 24000, req: 7, power: 2.0, colors: ['#ffffff', '#a0c4ff', '#7b2cbf', '#3a0ca3'], finisher: '星河隕落',
     desc: '金幣 +50%，切水果有機率掉下金色星星。砍 Boss 有機率召喚隕石。' },
-  { id: 'dragon', name: '龍神刀', icon: '🐉', price: 30000, req: 6, power: 2.5, colors: ['#fff3b0', '#ffd60a', '#e85d04', '#9d0208'], finisher: '龍神降臨',
-    desc: '最強之刀。有機率召喚龍息，橫掃整排水果。' },
+  { id: 'time', name: '時空刀', icon: '⏳', price: 30000, req: 8, power: 2.2, colors: ['#ffffff', '#cdb4db', '#6c757d'], finisher: '時間靜止',
+    desc: '有機率讓時間完全停止，所有水果靜止不動，任你切。' },
+  { id: 'candy', name: '糖果刀', icon: '🍭', price: 36000, req: 9, power: 2.3, rainbow: true, colors: ['#ff8fab'], finisher: '甜蜜爆炸',
+    desc: '水果會爆成糖果，連鎖切開附近的水果，每顆多加 1 分。' },
+  { id: 'dragon', name: '龍神刀', icon: '🐉', price: 45000, req: 10, power: 2.5, colors: ['#fff3b0', '#ffd60a', '#e85d04', '#9d0208'], finisher: '龍神降臨',
+    desc: '有機率召喚龍息，橫掃整排水果。' },
+  { id: 'angel', name: '天使之刃', icon: '👼', price: 50000, special: true, power: 3.0, colors: ['#ffffff', '#fff3b0', '#ffd6e5'], finisher: '天使降臨',
+    desc: '每日簽到 30 天才能獲得的限定神刀。天使光束會切開整排水果，還有機率回復愛心。' },
 ];
 
 // 關卡：每關 5 隻 Boss，打完解鎖下一關。fx = Boss 戰時的專屬背景動畫
@@ -305,7 +358,7 @@ const STAGES = [
       { name: '椰子將軍', skin: 'coconut', color: '#c08552', fx: 'wind' },
       { name: '南瓜魔王', skin: 'pumpkin', color: '#ff7b00', fx: 'ghost' },
     ] },
-  { name: '夕陽海灘', icon: '🏖️', bg: 'beach', diff: 1.15, hpMul: 1.4, card: 'linear-gradient(135deg,#ff9a76,#c04a82)',
+  { name: '夕陽海灘', icon: '🏖️', bg: 'beach', diff: 1.08, hpMul: 1.35, card: 'linear-gradient(135deg,#ff9a76,#c04a82)',
     bosses: [
       { name: '檸檬海盜', skin: 'lemon', color: '#ffd60a', fx: 'bubbles' },
       { name: '奇異果忍者', skin: 'kiwi', color: '#8ac926', fx: 'leaves' },
@@ -313,7 +366,7 @@ const STAGES = [
       { name: '李子巫師', skin: 'plum', color: '#9d4edd', fx: 'vortex' },
       { name: '雷霆椰子王', skin: 'coconut', color: '#ffd166', fx: 'storm' },
     ] },
-  { name: '櫻花庭園', icon: '🌸', bg: 'sakura', diff: 1.3, hpMul: 1.9, card: 'linear-gradient(135deg,#ffc8dd,#cd6799)',
+  { name: '櫻花庭園', icon: '🌸', bg: 'sakura', diff: 1.16, hpMul: 1.7, card: 'linear-gradient(135deg,#ffc8dd,#cd6799)',
     bosses: [
       { name: '草莓劍姬', skin: 'strawberry', color: '#ff2e63', fx: 'petals' },
       { name: '桃花仙人', skin: 'peach', color: '#ff8fab', fx: 'aurora' },
@@ -321,7 +374,7 @@ const STAGES = [
       { name: '蘋果大賢者', skin: 'apple', color: '#c77dff', fx: 'runes' },
       { name: '戀愛西瓜姬', skin: 'watermelon', color: '#ff5c8a', fx: 'hearts' },
     ] },
-  { name: '星空之夜', icon: '🌙', bg: 'night', diff: 1.45, hpMul: 2.5, card: 'linear-gradient(135deg,#3a0ca3,#10002b)',
+  { name: '星空之夜', icon: '🌙', bg: 'night', diff: 1.24, hpMul: 2.1, card: 'linear-gradient(135deg,#3a0ca3,#10002b)',
     bosses: [
       { name: '流星柳橙', skin: 'orange', color: '#ffd166', fx: 'starfall' },
       { name: '黑洞李子', skin: 'plum', color: '#7b2cbf', fx: 'vortex' },
@@ -329,7 +382,7 @@ const STAGES = [
       { name: '月光椰子', skin: 'coconut', color: '#bde0fe', fx: 'aurora' },
       { name: '幽靈南瓜王', skin: 'pumpkin', color: '#b5179e', fx: 'ghost' },
     ] },
-  { name: '熔岩火山', icon: '🌋', bg: 'volcano', diff: 1.6, hpMul: 3.2, card: 'linear-gradient(135deg,#e85d04,#370617)',
+  { name: '熔岩火山', icon: '🌋', bg: 'volcano', diff: 1.32, hpMul: 2.5, card: 'linear-gradient(135deg,#e85d04,#370617)',
     bosses: [
       { name: '熔岩西瓜', skin: 'watermelon', color: '#ff4d00', fx: 'lava' },
       { name: '火焰草莓', skin: 'strawberry', color: '#ff6a00', fx: 'rays' },
@@ -337,12 +390,63 @@ const STAGES = [
       { name: '雷電蘋果', skin: 'apple', color: '#ffd60a', fx: 'storm' },
       { name: '終焉南瓜魔神', skin: 'pumpkin', color: '#d00000', fx: 'lava' },
     ] },
+  { name: '海底世界', icon: '🐠', bg: 'ocean', diff: 1.4, hpMul: 3.0, card: 'linear-gradient(135deg,#48cae4,#023e8a)',
+    bosses: [
+      { name: '深海西瓜', skin: 'watermelon', color: '#48cae4', fx: 'bubbles' },
+      { name: '章魚李子', skin: 'plum', color: '#9d4edd', fx: 'vortex' },
+      { name: '海浪檸檬', skin: 'lemon', color: '#90e0ef', fx: 'storm' },
+      { name: '珊瑚水蜜桃', skin: 'peach', color: '#ff8fab', fx: 'hearts' },
+      { name: '海神椰子王', skin: 'coconut', color: '#00b4d8', fx: 'rays' },
+    ] },
+  { name: '冰雪王國', icon: '⛄', bg: 'snowland', diff: 1.48, hpMul: 3.5, card: 'linear-gradient(135deg,#caf0f8,#5e7ca6)',
+    bosses: [
+      { name: '雪人柳橙', skin: 'orange', color: '#caf0f8', fx: 'snow' },
+      { name: '冰晶奇異果', skin: 'kiwi', color: '#90e0ef', fx: 'aurora' },
+      { name: '暴風雪蘋果', skin: 'apple', color: '#ade8f4', fx: 'wind' },
+      { name: '冰封草莓', skin: 'strawberry', color: '#bde0fe', fx: 'runes' },
+      { name: '冰雪南瓜王', skin: 'pumpkin', color: '#a2d2ff', fx: 'storm' },
+    ] },
+  { name: '糖果樂園', icon: '🍭', bg: 'candy', diff: 1.56, hpMul: 4.1, card: 'linear-gradient(135deg,#ffafcc,#a2d2ff)',
+    bosses: [
+      { name: '棉花糖桃子', skin: 'peach', color: '#ffc8dd', fx: 'hearts' },
+      { name: '彩虹草莓', skin: 'strawberry', color: '#ff8fab', fx: 'petals' },
+      { name: '汽水檸檬', skin: 'lemon', color: '#caffbf', fx: 'bubbles' },
+      { name: '巧克力椰子', skin: 'coconut', color: '#b5838d', fx: 'seedRain' },
+      { name: '糖果南瓜大王', skin: 'pumpkin', color: '#ff70a6', fx: 'rays' },
+    ] },
+  { name: '天空之城', icon: '☁️', bg: 'sky', diff: 1.64, hpMul: 4.7, card: 'linear-gradient(135deg,#4cc9f0,#fcbf49)',
+    bosses: [
+      { name: '雲端西瓜', skin: 'watermelon', color: '#ffffff', fx: 'wind' },
+      { name: '雷鳥奇異果', skin: 'kiwi', color: '#ffd60a', fx: 'storm' },
+      { name: '天使水蜜桃', skin: 'peach', color: '#fff3b0', fx: 'petals' },
+      { name: '星辰李子', skin: 'plum', color: '#cdb4db', fx: 'starfall' },
+      { name: '天空之王蘋果', skin: 'apple', color: '#fcbf49', fx: 'rays' },
+    ] },
+  { name: '宇宙深處', icon: '🪐', bg: 'space', diff: 1.72, hpMul: 5.4, card: 'linear-gradient(135deg,#7209b7,#03071e)',
+    bosses: [
+      { name: '隕石柳橙', skin: 'orange', color: '#ff9f1c', fx: 'starfall' },
+      { name: '黑洞西瓜', skin: 'watermelon', color: '#3a0ca3', fx: 'vortex' },
+      { name: '外星奇異果', skin: 'kiwi', color: '#80ffdb', fx: 'runes' },
+      { name: '銀河李子', skin: 'plum', color: '#b5179e', fx: 'aurora' },
+      { name: '宇宙魔王南瓜', skin: 'pumpkin', color: '#f72585', fx: 'ghost' },
+    ] },
 ];
 const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血量
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.5.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
+const VERSION = '1.6.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
+// 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
+const CHANGELOG = {
+  '1.6.0': [
+    '🗡️ 新增 6 把刀：毒液刀、水流刀、黃金刀、聖光刀、時空刀、糖果刀，每把都有專屬特效和擊殺技',
+    '👼 新增限定神刀「天使之刃」：每日簽到累積 30 天就能領取',
+    '🗺️ 新增 5 個關卡：海底世界、冰雪王國、糖果樂園、天空之城、宇宙深處（現在共 10 關、50 隻 Boss）',
+    '📈 越後面的關卡難度會稍微提高，Boss 也更耐打',
+    '📅 每日簽到取代每日登入：每天簽到領金幣，第 7、14、21、28 天有大獎',
+    '⏳ 新增讀取畫面，以後每次更新都會在這裡告訴你更新了什麼',
+  ],
+};
 
 // 能力強化：用金幣永久升級（跟刀分開）
 const PERKS = [
@@ -359,7 +463,7 @@ const HIT_RADIUS = 0.6; // 判定半徑（相對水果圖示半徑）
 // ===== 存檔 =====
 const SAVE_KEY = 'fruitslash_save_v1';
 // cloud = { code: 恢復碼, name: 暱稱 }，只存在這支手機，不會上傳到 save 欄位裡
-const defaultSave = () => ({ coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null, bossFirst: {}, daily: null });
+const defaultSave = () => ({ coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null, bossFirst: {}, daily: null, checkin: null, seenVersion: null });
 let save = defaultSave();
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
 function persist() {
@@ -770,8 +874,8 @@ const coinMult = () => save.equipped === 'galaxy' ? 1.5 : save.equipped === 'lov
 const hitMul = () => save.equipped === 'wind' ? 1.3 + 0.12 * bladeLvl() : 1;
 const upgradeCost = (b, lvl) => Math.round((b.price * 0.3 + 60) * Math.pow(1.6, lvl - 1)); // 每升一級貴 1.6 倍
 // 刀的解鎖條件：req 1～5 = 要解鎖到第幾關，6 = 打通全部關卡
-const bladeUnlocked = b => (b.req || 1) <= save.unlocked + (save.cleared[STAGES.length - 1] ? 1 : 0);
-const reqText = b => b.req >= 6 ? '打通全部關卡後解鎖' : `通過第 ${b.req - 1} 關後解鎖`;
+const bladeUnlocked = b => !b.special && (b.req || 1) <= save.unlocked + (save.cleared[STAGES.length - 1] ? 1 : 0);
+const reqText = b => b.special ? '每日簽到 30 天獲得' : b.req > STAGES.length ? '打通全部關卡後解鎖' : `通過第 ${b.req - 1} 關後解鎖`;
 function effectText(b, lvl) {
   const d = `Boss 傷害 ${dmgOf(b, lvl)}`;
   switch (b.id) {
@@ -784,6 +888,13 @@ function effectText(b, lvl) {
     case 'love': return `${d}・金幣 +25%・${3 * lvl}% 機率回復愛心`;
     case 'galaxy': return `${d}・金幣 +50%・${3 * lvl}% 機率掉落金星`;
     case 'dragon': return `${d}・${5 + 2 * lvl}% 機率噴出龍息橫掃`;
+    case 'poison': return `${d}・毒霧範圍 ${10 + 2 * lvl}%・持續 ${(1 + 0.2 * lvl).toFixed(1)} 秒`;
+    case 'water': return `${d}・水刃延伸 ${30 + 6 * lvl}%`;
+    case 'gold': return `${d}・${15 + 5 * lvl}% 機率額外金幣`;
+    case 'holy': return `${d}・${4 + 2 * lvl}% 機率獲得護盾`;
+    case 'time': return `${d}・${6 + 2 * lvl}% 機率時間靜止 ${(0.8 + 0.2 * lvl).toFixed(1)} 秒`;
+    case 'candy': return `${d}・${30 + 6 * lvl}% 機率糖果連鎖・每顆 +1 分`;
+    case 'angel': return `${d}・${8 + 2 * lvl}% 機率天使光束・5% 回復愛心`;
     default: return d;
   }
 }
@@ -799,7 +910,7 @@ function newGame(stage) {
   G = { stage, st, score: 0, hearts: START_HEARTS + perkLvl('life'), coinsEarned: 0, coinFrac: 0, objs: [], pending: [], pieces: [], parts: [], splats: [],
     rings: [], bolts: [], texts: [], homers: [], slashes: [], beams: [], spawnT: 0.8, time: 0, timeScale: 1, slowT: 0,
     shake: 0, flash: 0, flashColor: '#fff', boss: null, bossIndex: 0, nextBoss: BOSS_AT[0], warnT: 0, overT: 0,
-    strokeCount: 0, trail: [], fin: null, bfx: null, clearT: 0, done: false };
+    strokeCount: 0, trail: [], clouds: [], pillars: [], shield: 0, freezeT: 0, fin: null, bfx: null, clearT: 0, done: false };
   initBG(st.bg);
 }
 const gravity = () => H * 1.25;
@@ -925,7 +1036,7 @@ function hitObj(o, ang, byEffect, off = 0) {
   if (o.kind === 'star') { const c = addCoins(5 * coinMult()); text(o.x, o.y, `+${c} 💰`, '#ffd166'); sfx.coin(); }
   if (o.kind === 'heart') { G.hearts = Math.min(MAX_HEARTS, G.hearts + 1); text(o.x, o.y, '+❤️', '#ff5c8a'); sfx.coin(); }
   sfx.slice();
-  if (!byEffect) bladeEffect(o);
+  if (!byEffect) bladeEffect(o, ang);
   updateHUD();
 }
 
@@ -935,7 +1046,7 @@ function nearestFruit(x, y, maxD = Infinity) {
   return best;
 }
 
-function bladeEffect(o) {
+function bladeEffect(o, ang = 0) {
   const b = blade(), lvl = bladeLvl();
   if (b.id === 'fire') {
     const R = S * (0.14 + 0.035 * lvl);
@@ -981,6 +1092,35 @@ function bladeEffect(o) {
   } else if (b.id === 'dragon') {
     juice(o.x, o.y, '#ffd60a', 6, 1.2);
     if (Math.random() < 0.05 + 0.02 * lvl) dragonBreath(o.y);
+  } else if (b.id === 'poison') {
+    const life = 1 + 0.2 * lvl;
+    G.clouds.push({ x: o.x, y: o.y, r: S * (0.1 + 0.02 * lvl), life, max: life });
+  } else if (b.id === 'water') {
+    // 水刃沿著刀的方向往前延伸
+    const L = S * (0.3 + 0.06 * lvl), ca = Math.cos(ang), sa = Math.sin(ang);
+    slash(o.x, o.y, o.x + ca * L, o.y + sa * L, '#90e0ef', S * 0.016, 0.35, true);
+    for (const t of G.objs) {
+      if (t.dead || t.kind === 'bomb') continue;
+      const dx = t.x - o.x, dy = t.y - o.y, along = dx * ca + dy * sa;
+      if (along > 0 && along < L && Math.abs(-dx * sa + dy * ca) < t.r) hitObj(t, ang, true);
+    }
+  } else if (b.id === 'gold') {
+    if (Math.random() < 0.15 + 0.05 * lvl) { const c = addCoins(2 + (Math.random() * 3 | 0)); text(o.x, o.y - o.r, `+${c} 💰`, '#ffd166', 0.06, 0.8); emojiBurst(o.x, o.y, '🪙', 3, S * 0.03); sfx.coin(); }
+  } else if (b.id === 'holy') {
+    if (!G.shield && Math.random() < 0.04 + 0.02 * lvl) { G.shield = 1; ring(o.x, o.y, S * 0.2, '#ffd166', 0.5); text(o.x, o.y - o.r, '🛡️ 獲得護盾', '#fff3b0', 0.06, 1); sfx.freeze(); updateHUD(); }
+  } else if (b.id === 'time') {
+    if (G.freezeT <= 0 && Math.random() < 0.06 + 0.02 * lvl) { G.freezeT = 0.8 + 0.2 * lvl; text(W / 2, H * 0.45, '⏳ 時間靜止！', '#e0e0e0', 0.08, 1.2); tone(600, 200, 0.6, 0.1, 'triangle'); }
+  } else if (b.id === 'candy') {
+    emojiBurst(o.x, o.y, ['🍬', '🍭', '🍫'][Math.random() * 3 | 0], 3, S * 0.035);
+    G.score += 1;
+    if (Math.random() < 0.3 + 0.06 * lvl) {
+      const t = nearestFruit(o.x, o.y, S * 0.35);
+      if (t) { slash(o.x, o.y, t.x, t.y, `hsl(${Math.random() * 360 | 0},100%,70%)`, S * 0.012, 0.3); hitObj(t, Math.random() * 6, true); }
+    }
+  } else if (b.id === 'angel') {
+    for (let i = 0; i < 2; i++) addPart({ x: o.x, y: o.y, vx: (Math.random() - 0.5) * S * 0.4, vy: -S * 0.2, life: 0.9, max: 0.9, kind: 'petal', color: '#ffffff', size: S * 0.012, g: 0.1, rot: Math.random() * 6 });
+    if (Math.random() < 0.05 && G.hearts < MAX_HEARTS) { G.hearts++; text(o.x, o.y - o.r, '+❤️', '#ff5c8a'); }
+    if (Math.random() < 0.08 + 0.02 * lvl) angelBeam(o.x);
   }
 }
 
@@ -1041,8 +1181,30 @@ function explodeBomb(o) {
   loseHeart();
 }
 
+// 天使光束：從天而降的一道光，切開這一直排的水果
+function angelBeam(x) {
+  pillar(x, '#fff3b0');
+  text(x, H * 0.3, '👼 天使光束', '#fff3b0', 0.06, 1); tone(1600, 800, 0.4, 0.08, 'sine');
+  for (const t of G.objs) if (!t.dead && t.kind !== 'bomb' && Math.abs(t.x - x) < S * 0.1 + t.r * 0.5) hitObj(t, Math.PI / 2, true);
+  const b = G.boss; if (b && !G.fin && Math.abs(b.x - x) < b.r + S * 0.1) damageBoss(3 + bladeLvl());
+}
+function pillar(x, color) { G.pillars.push({ x, color, life: 0.6, max: 0.6 }); }
+// 毒霧與光柱的更新：毒霧會溶掉碰到的水果
+function updateZones(dt, rdt) {
+  for (const c of G.clouds) {
+    c.life -= dt;
+    for (const t of G.objs) if (!t.dead && t.kind !== 'bomb' && Math.hypot(t.x - c.x, t.y - c.y) < c.r + t.r * 0.5) hitObj(t, Math.random() * 6, true);
+    if (Math.random() < 0.4) addPart({ x: c.x + (Math.random() - 0.5) * c.r * 1.5, y: c.y + (Math.random() - 0.5) * c.r, vx: 0, vy: -S * 0.1, life: 0.6, max: 0.6, color: Math.random() < 0.5 ? '#80ed99' : '#e9ff70', size: S * 0.008, g: 0 });
+  }
+  G.clouds = G.clouds.filter(c => c.life > 0);
+  for (const p of G.pillars) p.life -= rdt;
+  G.pillars = G.pillars.filter(p => p.life > 0);
+}
+
 function loseHeart() {
   if (G.overT > 0 || G.done) return;
+  // 聖光刀的護盾：抵擋一次
+  if (G.shield > 0) { G.shield--; text(W / 2, H * 0.5, '🛡️ 護盾抵擋！', '#fff3b0', 0.08, 1); ring(W / 2, H * 0.5, S * 0.3, '#ffd166', 0.5); updateHUD(); return; }
   G.hearts--;
   updateHUD();
   if (G.hearts <= 0) G.overT = 1.0;
@@ -1126,6 +1288,21 @@ function bossBladeEffect(b) {
     }
   } else if (id === 'dragon') {
     if (Math.random() < 0.15) dragonBreath(b.y);
+  } else if (id === 'poison') {
+    b.burn = 3; b.burnDps = 0.3 * lvl; burst(b.x, b.y, 'dot', 8, ['#80ed99', '#e9ff70'], 0.5, 0.008, 0.5);
+  } else if (id === 'water') {
+    if (Math.random() < 0.25) { slash(b.x - b.r * 2, b.y, b.x + b.r * 2, b.y, '#90e0ef', S * 0.016, 0.3, true); damageBoss(+(1.5 + 0.5 * lvl).toFixed(1)); }
+  } else if (id === 'gold') {
+    if (Math.random() < 0.2) { const c = addCoins(5); text(b.x, b.y + b.r, `+${c} 💰`, '#ffd166', 0.06, 0.8); emojiBurst(b.x, b.y, '🪙', 4, S * 0.035); }
+  } else if (id === 'holy') {
+    if (Math.random() < 0.2) { pillar(b.x, '#fff3b0'); damageBoss(+(2 + 0.5 * lvl).toFixed(1)); }
+  } else if (id === 'time') {
+    b.slow = 1.5 + 0.3 * lvl; ring(b.x, b.y, b.r * 1.4, '#cdb4db', 0.4);
+  } else if (id === 'candy') {
+    if (Math.random() < 0.2) { emojiBurst(b.x, b.y, '🍬', 5, S * 0.04); damageBoss(+(1 + 0.5 * lvl).toFixed(1)); }
+  } else if (id === 'angel') {
+    if (Math.random() < 0.25) { pillar(b.x, '#ffffff'); damageBoss(3 + lvl); }
+    if (Math.random() < 0.03 && G.hearts < MAX_HEARTS) { G.hearts++; text(b.x, b.y + b.r, '+❤️', '#ff5c8a'); updateHUD(); }
   }
 }
 // Boss 攻擊分兩段：先蓄力預告（停住、發紅光、畫出炸彈落點軌跡），時間到才真的丟出去
@@ -1185,7 +1362,8 @@ function finishBoss() {
 
 // ===== 擊殺技：每把刀打倒 Boss 時的專屬特效 =====
 const FIN_COLOR = { basic: '#ffffff', fire: '#ff9f1c', ice: '#e0fbfc', sakura: '#ffc8dd', thunder: '#fff3a0', wind: '#d8f3dc',
-  shadow: '#240046', love: '#ffc2d1', galaxy: '#ffffff', dragon: '#ffd60a' };
+  shadow: '#240046', love: '#ffc2d1', galaxy: '#ffffff', dragon: '#ffd60a', poison: '#80ed99', water: '#90e0ef', gold: '#ffd166',
+  holy: '#fff3b0', time: '#e0e0e0', candy: '#ffafcc', angel: '#ffffff' };
 function startFinisher(b) {
   const bl = blade();
   b.fin = true; b.windup = 0; b.plan = null; b.burn = 0;
@@ -1320,6 +1498,50 @@ function updateFinisher(f, rdt) {
       }
       break;
     }
+    case 'poison':
+      if (charging) for (let i = 0; i < 3; i++) orbitPart(x, y, 'dot', ['#e9ff70', '#80ed99', '#2d6a4f'][Math.random() * 3 | 0], { size: S * 0.012 });
+      if (at(0.5) || at(0.9)) { ring(x, y, r * 2, '#80ed99', 0.4); noise(0.3, 300, 0.15, 'lowpass'); }
+      if (at(brk)) {
+        breakBoss(0.9);
+        for (let i = 0; i < 3; i++) ring(x, y, S * (0.4 + i * 0.25), ['#e9ff70', '#80ed99', '#2d6a4f'][i], 0.7 + i * 0.15, 0.05);
+        burst(x, y, 'ghost', 30, ['#2d6a4f', '#52b788', '#95d5b2'], 1.2, 0.05, 1.2); burst(x, y, 'dot', 50, ['#e9ff70', '#80ed99'], 1.6, 0.008, 1);
+      }
+      break;
+    case 'water':
+      if (charging) for (let i = 0; i < 3; i++) orbitPart(x, y, 'streak', ['#ffffff', '#90e0ef', '#00b4d8'][Math.random() * 3 | 0], { size: S * 0.006 });
+      if (at(brk)) { breakBoss(-0.1); bigSlash(x, y, -0.1, '#90e0ef', S * 0.04, 0.8); burst(x, y, 'dot', 70, ['#ffffff', '#90e0ef', '#0077b6'], 1.8, 0.009, 1.1); noise(0.8, 600, 0.3, 'lowpass'); }
+      break;
+    case 'gold':
+      if (charging && every(0.06)) orbitPart(x, y, null, null, { e: Math.random() < 0.5 ? '🪙' : '💰', size: S * 0.04 });
+      if (at(brk)) {
+        breakBoss(0.4); ring(x, y, S * 0.8, '#ffd166', 0.7, 0.05);
+        emojiBurst(x, y, '🪙', 30, S * 0.05, 1.4, true); emojiBurst(x, y, '💰', 12, S * 0.05, 1.2, true);
+        [0, 0.1, 0.2].forEach(d => tone(1200 + d * 3000, 1800, 0.2, 0.08, 'square', d));
+      }
+      break;
+    case 'holy':
+      if (charging && every(0.12)) { const px = x + (Math.random() - 0.5) * S * 0.8; slash(px, 0, px, H, '#fff3b0', S * 0.02, 0.3, true); tone(1500, 1500, 0.15, 0.04, 'sine'); }
+      if (at(brk)) { breakBoss(1.57); for (let i = 0; i < 3; i++) ring(x, y, S * (0.4 + i * 0.25), ['#ffffff', '#fff3b0', '#ffd166'][i], 0.7, 0.05); burst(x, y, 'streak', 50, ['#ffffff', '#fff3b0'], 1.8, 0.006, 0.8); }
+      break;
+    case 'time':
+      // 時間靜止：刀光一道道停在空中，最後一起斬下
+      if (charging && every(0.1)) { const a = Math.random() * Math.PI, d = r * 1.8; slash(x - Math.cos(a) * d, y - Math.sin(a) * d, x + Math.cos(a) * d, y + Math.sin(a) * d, '#cdb4db', S * 0.01, brk - f.t + 0.25, true); tone(2000, 2000, 0.03, 0.05, 'square'); }
+      if (at(brk)) { breakBoss(0.7); burst(x, y, 'streak', 60, ['#ffffff', '#cdb4db'], 2, 0.006, 0.7); ring(x, y, S, '#ffffff', 0.6, 0.04); noise(0.4, 3000, 0.25); }
+      break;
+    case 'candy':
+      if (charging && every(0.05)) orbitPart(x, y, null, null, { e: ['🍬', '🍭', '🍫', '🧁'][Math.random() * 4 | 0], size: S * 0.045 });
+      if (at(brk)) { breakBoss(-0.6); for (let i = 0; i < 5; i++) ring(x, y, S * (0.3 + i * 0.18), `hsl(${i * 70},100%,70%)`, 0.6 + i * 0.1, 0.035); for (const e of ['🍬', '🍭', '🍫', '🧁']) emojiBurst(x, y, e, 10, S * 0.05, 1.3, true); }
+      break;
+    case 'angel':
+      if (charging && every(0.05)) addPart({ x: x + (Math.random() - 0.5) * W * 0.8, y: -20, vx: (Math.random() - 0.5) * S * 0.2, vy: S * 0.5, life: 1.5, max: 1.5, kind: 'petal', color: '#ffffff', size: S * 0.014, g: 0, rot: Math.random() * 6, rt: true });
+      if (at(brk)) {
+        breakBoss(0);
+        for (let i = 0; i < 4; i++) ring(x, y, S * (0.4 + i * 0.25), ['#ffffff', '#fff3b0', '#ffd6e5', '#ffd166'][i], 0.8, 0.05);
+        const d = Math.hypot(W, H);
+        slash(x - d, y - d * 0.5, x + d, y + d * 0.5, '#fff3b0', S * 0.035, 0.8, true); slash(x + d, y - d * 0.5, x - d, y + d * 0.5, '#fff3b0', S * 0.035, 0.8, true);
+        burst(x, y, 'petal', 80, ['#ffffff', '#fff3b0', '#ffd6e5'], 1.5, 0.016, 1.5); sfx.win();
+      }
+      break;
   }
 }
 // 龍神刀擊殺技：龍頭沿著波浪路線從左飛到右，剛好在 brk 時穿過 Boss
@@ -1347,6 +1569,18 @@ function initBG(type) {
   } else if (type === 'volcano') {
     BG.items = Array.from({ length: 45 }, () => ({ x: R(), y: R(), v: 0.05 + R() * 0.1, s: 0.5 + R(), ph: R() * 6 }));
     BG.blobs = []; BG.erupt = 1;
+  } else if (type === 'ocean') {
+    BG.items = Array.from({ length: 30 }, () => ({ x: R(), y: R(), v: 0.03 + R() * 0.06, s: 0.5 + R() * 1.5, ph: R() * 6 }));
+    BG.fish = Array.from({ length: 6 }, () => ({ x: R(), y: 0.2 + R() * 0.55, v: (0.02 + R() * 0.04) * (R() < 0.5 ? 1 : -1), s: 0.6 + R() * 0.8 }));
+  } else if (type === 'snowland') {
+    BG.items = Array.from({ length: 60 }, () => ({ x: R(), y: R(), v: 0.03 + R() * 0.05, s: 0.5 + R() * 1.5, ph: R() * 6 }));
+  } else if (type === 'candy') {
+    BG.items = Array.from({ length: 40 }, () => ({ x: R(), y: R(), v: 0.02 + R() * 0.04, rot: R() * 6, c: ['#ff70a6', '#70d6ff', '#ffd670', '#e9ff70', '#ff9770'][R() * 5 | 0] }));
+  } else if (type === 'sky') {
+    BG.items = Array.from({ length: 7 }, () => ({ x: R() * 1.4 - 0.2, y: 0.1 + R() * 0.6, s: 0.6 + R() * 1.2, v: 0.006 + R() * 0.01 }));
+  } else if (type === 'space') {
+    BG.items = Array.from({ length: 140 }, () => ({ x: R(), y: R(), s: 0.4 + R() * 1.6, tw: 1 + R() * 3, ph: R() * 6 }));
+    BG.rocks = Array.from({ length: 5 }, () => ({ x: R(), y: R(), v: 0.01 + R() * 0.02, s: 0.5 + R(), rot: R() * 6, seed: (R() * 1e6 | 0) + 1 }));
   }
 }
 function vgrad(y0, y1, stops) { const gr = ctx.createLinearGradient(0, y0, 0, y1); for (const [o, c] of stops) gr.addColorStop(o, c); return gr; }
@@ -1509,6 +1743,117 @@ const BGDRAW = {
     }
     ctx.globalAlpha = 1;
     ctx.fillStyle = vgrad(H * 0.85, H, [[0, 'rgba(255,80,0,0)'], [1, `rgba(255,80,0,${0.35 * pulse})`]]); ctx.fillRect(0, H * 0.85, W, H * 0.15);
+  },
+  ocean(t, dt) {
+    ctx.fillStyle = vgrad(0, H, [[0, '#48cae4'], [0.4, '#0077b6'], [1, '#03045e']]); ctx.fillRect(0, 0, W, H);
+    // 從水面照下來的光
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 6; i++) {
+      const x = W * (0.1 + i * 0.17) + Math.sin(t * 0.5 + i) * W * 0.03;
+      ctx.globalAlpha = 0.07 + 0.04 * Math.sin(t + i); ctx.fillStyle = '#caf0f8';
+      ctx.beginPath(); ctx.moveTo(x - W * 0.03, 0); ctx.lineTo(x + W * 0.03, 0); ctx.lineTo(x + W * 0.12, H); ctx.lineTo(x - W * 0.02, H); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    for (const f of BG.fish) {
+      f.x += f.v * dt; if (f.x > 1.15) f.x = -0.15; if (f.x < -0.15) f.x = 1.15;
+      const s = S * 0.04 * f.s;
+      ctx.save(); ctx.translate(f.x * W, f.y * H + Math.sin(t * 2 + f.s * 5) * 6); ctx.scale(f.v > 0 ? 1 : -1, 1);
+      ctx.globalAlpha = 0.35; ctx.fillStyle = '#023e8a';
+      ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.45, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-s * 0.8, 0); ctx.lineTo(-s * 1.5, -s * 0.45); ctx.lineTo(-s * 1.5, s * 0.45); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#1b4332'; ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const bx = W * (i + 0.5) / 9, hgt = H * (0.15 + (i % 3) * 0.06);
+      ctx.lineWidth = S * 0.015; ctx.beginPath(); ctx.moveTo(bx, H);
+      for (let k = 1; k <= 8; k++) ctx.lineTo(bx + Math.sin(t * 1.5 + i + k * 0.6) * S * 0.02 * k / 8, H - hgt * k / 8);
+      ctx.stroke();
+    }
+    hills(H * 0.95, H * 0.015, 3, 1, '#e9c46a');
+    ctx.strokeStyle = '#caf0f8'; ctx.lineWidth = 1;
+    for (const b of BG.items) {
+      b.y -= b.v * dt; if (b.y < -0.05) { b.y = 1.05; b.x = Math.random(); }
+      ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(b.x * W + Math.sin(t * 2 + b.ph) * 6, b.y * H, 1.5 * b.s + 1, 0, 7); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  },
+  snowland(t, dt) {
+    ctx.fillStyle = vgrad(0, H, [[0, '#a2d2ff'], [0.6, '#e0f2ff'], [1, '#ffffff']]); ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 2; i++) {
+      ctx.fillStyle = vgrad(0, H * 0.3, [[0, i ? 'rgba(128,255,219,0.6)' : 'rgba(179,136,255,0.5)'], [1, 'rgba(255,255,255,0)']]);
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      for (let x = 0; x <= W; x += 20) ctx.lineTo(x, H * (0.12 + i * 0.05) + Math.sin(x * 0.01 + t * 0.5 + i) * H * 0.04);
+      ctx.lineTo(W, 0); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const [base, col, cap] of [[0.55, '#8eaccd', '#ffffff'], [0.68, '#6d8db5', '#eef6ff']]) {
+      const peaks = [[0, base + 0.1], [0.18, base - 0.12], [0.33, base + 0.02], [0.5, base - 0.18], [0.67, base], [0.82, base - 0.1], [1, base + 0.06]];
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, H);
+      for (const [px, py] of peaks) ctx.lineTo(px * W, py * H);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = cap;
+      for (const [px, py] of peaks) if (py < base - 0.05) { ctx.beginPath(); ctx.moveTo(px * W, py * H); ctx.lineTo(px * W - W * 0.04, py * H + H * 0.06); ctx.lineTo(px * W + W * 0.04, py * H + H * 0.06); ctx.closePath(); ctx.fill(); }
+    }
+    hills(H * 0.88, H * 0.015, 3, 2, '#ffffff');
+    ctx.fillStyle = '#ffffff';
+    for (const s of BG.items) { s.y += s.v * dt; if (s.y > 1.02) { s.y = -0.02; s.x = Math.random(); } ctx.globalAlpha = 0.9; circle(s.x * W + Math.sin(t + s.ph) * 10, s.y * H, s.s + 0.5); }
+    ctx.globalAlpha = 1;
+  },
+  candy(t, dt) {
+    ctx.fillStyle = vgrad(0, H, [[0, '#ffc8dd'], [0.5, '#e0c3fc'], [1, '#bde0fe']]); ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = S * 0.03;
+    ['#ff70a6', '#ff9770', '#ffd670', '#e9ff70', '#70d6ff', '#a78bfa'].forEach((c, i) => { ctx.strokeStyle = c; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(W * 0.5, H * 0.95, W * 0.45 - i * S * 0.03, Math.PI, 0); ctx.stroke(); });
+    ctx.globalAlpha = 1;
+    hills(H * 0.78, H * 0.03, 4, 1, '#ffafcc'); hills(H * 0.88, H * 0.025, 6, 3, '#cdb4db');
+    // 棒棒糖樹
+    for (let i = 0; i < 6; i++) {
+      const x = W * (0.08 + i * 0.17), y = H * (0.8 + (i % 2) * 0.05), rr = S * (0.05 + (i % 3) * 0.012);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = S * 0.01; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - rr * 3); ctx.stroke();
+      ctx.save(); ctx.translate(x, y - rr * 3); ctx.rotate(t * 0.5 + i);
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = ['#ff70a6', '#ffffff', '#70d6ff', '#ffffff'][k]; ctx.beginPath(); ctx.arc(k * rr * 0.08, 0, rr * (1 - k * 0.22), 0, 7); ctx.fill(); }
+      ctx.restore();
+    }
+    for (const s of BG.items) {
+      s.y += s.v * dt; s.rot += dt * 2; if (s.y > 1.05) { s.y = -0.05; s.x = Math.random(); }
+      ctx.save(); ctx.translate(s.x * W, s.y * H); ctx.rotate(s.rot); ctx.fillStyle = s.c; ctx.fillRect(-S * 0.008, -S * 0.0025, S * 0.016, S * 0.005); ctx.restore();
+    }
+  },
+  sky(t, dt) {
+    ctx.fillStyle = vgrad(0, H, [[0, '#4cc9f0'], [0.6, '#bde0fe'], [1, '#fff1d0']]); ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = radial(ctx, W * 0.2, H * 0.15, 0, S * 0.6, [[0, 'rgba(255,230,150,0.8)'], [1, 'rgba(255,230,150,0)']]); ctx.fillRect(0, 0, W, H);
+    // 浮空島
+    for (const [ix, iy, is] of [[0.18, 0.62, 1], [0.78, 0.5, 0.8], [0.52, 0.75, 0.6]]) {
+      const x = ix * W, y = iy * H + Math.sin(t + ix * 5) * 8, s = S * 0.25 * is;
+      ctx.fillStyle = '#6b4226'; ctx.beginPath(); ctx.moveTo(x - s, y); ctx.lineTo(x + s, y); ctx.lineTo(x + s * 0.3, y + s * 0.7); ctx.lineTo(x - s * 0.2, y + s * 0.9); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#52b788'; ctx.beginPath(); ctx.ellipse(x, y, s * 1.02, s * 0.12, 0, 0, 7); ctx.fill();
+      drawTree(x - s * 0.4, y, s * 0.35, t); drawTree(x + s * 0.35, y, s * 0.28, t);
+    }
+    for (const c of BG.items) { c.x += c.v * dt; if (c.x > 1.3) c.x = -0.3; drawCloud(c.x * W, c.y * H, S * 0.11 * c.s); }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 12; i++) circle(W * i / 11 + Math.sin(t * 0.3 + i) * 10, H * 0.98, S * (0.1 + (i % 3) * 0.03));
+  },
+  space(t, dt) {
+    ctx.fillStyle = vgrad(0, H, [[0, '#03071e'], [1, '#10002b']]); ctx.fillRect(0, 0, W, H);
+    for (const [nx, ny, c] of [[0.25, 0.3, '114,9,183'], [0.75, 0.6, '247,37,133'], [0.55, 0.2, '72,149,239']]) {
+      ctx.fillStyle = radial(ctx, nx * W, ny * H, 0, S * 0.6, [[0, `rgba(${c},0.35)`], [1, `rgba(${c},0)`]]); ctx.fillRect(0, 0, W, H);
+    }
+    ctx.fillStyle = '#ffffff';
+    for (const s of BG.items) { ctx.globalAlpha = 0.3 + 0.7 * Math.abs(Math.sin(t * s.tw + s.ph)); circle(s.x * W, s.y * H, s.s * 0.8); }
+    ctx.globalAlpha = 1;
+    const px = W * 0.82, py = H * 0.25, pr = S * 0.12;
+    ctx.fillStyle = radial(ctx, px - pr * 0.3, py - pr * 0.3, 0, pr, [[0, '#ffb703'], [1, '#9d4edd']]); circle(px, py, pr);
+    ctx.strokeStyle = 'rgba(255,214,112,0.6)'; ctx.lineWidth = S * 0.008; ctx.beginPath(); ctx.ellipse(px, py, pr * 1.7, pr * 0.4, -0.3, 0, 7); ctx.stroke();
+    ctx.fillStyle = radial(ctx, W * 0.12, H * 0.8, 0, S * 0.07, [[0, '#90e0ef'], [1, '#023e8a']]); circle(W * 0.12, H * 0.8, S * 0.07);
+    for (const a of BG.rocks) {
+      a.x -= a.v * dt; a.rot += dt; if (a.x < -0.1) { a.x = 1.1; a.y = Math.random(); }
+      const R = rng(a.seed);
+      ctx.save(); ctx.translate(a.x * W, a.y * H); ctx.rotate(a.rot); ctx.fillStyle = '#6c584c'; ctx.beginPath();
+      for (let k = 0; k < 8; k++) { const an = k / 8 * Math.PI * 2, rr = S * 0.02 * a.s * (0.7 + R() * 0.5); k ? ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr) : ctx.moveTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
   },
 };
 function drawStageBG(now) {
@@ -1695,7 +2040,8 @@ function drawBossFx(fx, now) {
 function update(rdt) {
   G.time += rdt;
   G.slowT -= rdt;
-  const target = G.fin ? 0.22 : G.slowT > 0 ? 0.4 : 1;
+  G.freezeT -= rdt;
+  const target = G.fin ? 0.22 : G.freezeT > 0 ? 0.03 : G.slowT > 0 ? 0.4 : 1;
   G.timeScale += (target - G.timeScale) * Math.min(1, rdt * 6);
   const dt = rdt * G.timeScale, g = gravity();
 
@@ -1730,6 +2076,7 @@ function update(rdt) {
 
   updateHomers(dt);
   updateBeams(rdt);
+  updateZones(dt, rdt);
   for (const p of G.pieces) { const pd = p.r > S * 0.1 ? rdt * 0.6 : dt; p.vy += g * pd; p.x += p.vx * pd; p.y += p.vy * pd; p.d += p.vd * pd; }
   G.pieces = G.pieces.filter(p => p.y < H + S * 0.4);
   for (const p of G.parts) {
@@ -1815,6 +2162,10 @@ function drawFinisherUnder(f, now) {
     ctx.globalAlpha = 0.5 * a; ctx.fillStyle = radial(ctx, f.x, f.y, 0, s * 1.4, [[0, 'rgba(255,92,138,0.9)'], [1, 'rgba(255,92,138,0)']]);
     heartPath(f.x, f.y + s * 0.2, s); ctx.fill(); ctx.globalAlpha = 1;
   }
+  if (f.id === 'time') {
+    ctx.globalAlpha = 0.35 * a; ctx.fillStyle = '#8a8a8a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+    drawSprite('⏳', S * 0.5, W / 2, H / 2, 0, 0.12 * a);
+  }
   if (f.id === 'thunder' && t < f.brk) {
     ctx.globalAlpha = 0.3 * a; ctx.fillStyle = radial(ctx, f.x, f.y, 0, S * 0.5, [[0, 'rgba(255,243,160,0.7)'], [1, 'rgba(255,243,160,0)']]); ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
   }
@@ -1877,6 +2228,37 @@ function drawFinisherOver(f, now) {
   }
   ctx.restore();
 
+  if (f.id === 'holy' && after > 0 && after < 0.9) {
+    const w = r * 2.4 * (1 - after / 0.9 * 0.6);
+    const gr = ctx.createLinearGradient(x - w, 0, x + w, 0);
+    gr.addColorStop(0, 'rgba(255,209,102,0)'); gr.addColorStop(0.3, 'rgba(255,243,176,0.8)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.7, 'rgba(255,243,176,0.8)'); gr.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.save(); ctx.globalAlpha = 1 - after / 0.9; ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gr; ctx.fillRect(x - w, 0, w * 2, H); ctx.restore();
+  }
+  if (f.id === 'water' && after > 0 && after < 0.9) {
+    const k2 = after / 0.9, hgt = S * 0.5 * (1 - k2 * 0.5);
+    ctx.save(); ctx.globalAlpha = 1 - k2;
+    ctx.fillStyle = vgrad(y - hgt, y + hgt, [[0, 'rgba(0,119,182,0)'], [0.5, 'rgba(144,224,239,0.8)'], [1, 'rgba(0,119,182,0)']]);
+    ctx.beginPath(); ctx.moveTo(0, y + hgt);
+    for (let xx = 0; xx <= W; xx += 10) ctx.lineTo(xx, y - hgt * 0.6 + Math.sin(xx * 0.02 + now / 80) * hgt * 0.3);
+    ctx.lineTo(W, y + hgt); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  if (f.id === 'angel' && t < f.brk + 0.4) {
+    // 天使的翅膀：從 Boss 兩側展開
+    const k2 = Math.min(1, t / f.brk), flap = Math.sin(now / 120) * 0.15;
+    ctx.save(); ctx.globalAlpha = 0.85 * (t < f.brk ? 1 : 1 - (t - f.brk) / 0.4);
+    for (const side of [-1, 1]) {
+      ctx.save(); ctx.translate(x + side * r * 0.6, y - r * 0.2); ctx.scale(side, 1); ctx.rotate(-0.3 - flap);
+      for (let i = 0; i < 6; i++) {
+        ctx.save(); ctx.rotate(-i * 0.22);
+        const len = r * (1.6 - i * 0.12) * k2;
+        ctx.fillStyle = vgrad(-r * 0.13, r * 0.13, [[0, '#ffffff'], [1, '#ffe8a3']]);
+        ctx.beginPath(); ctx.ellipse(len * 0.5, 0, Math.max(1, len * 0.5), r * 0.13, 0, 0, 7); ctx.fill(); ctx.restore();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
   // 招式名稱
   if (t > 0.05 && t < f.dur) {
     const appear = Math.min(1, (t - 0.05) / 0.25), fade = Math.min(1, (f.dur - t) / 0.4);
@@ -1947,7 +2329,8 @@ function render(now) {
     const bx = b.x + jit, by = b.y + jit, tilt = Math.sin(b.t * 2) * 0.12;
     ctx.save();
     if (f) ctx.filter = { ice: `saturate(${1 - fk * 0.8}) hue-rotate(${fk * 170}deg) brightness(${1 + fk * 0.6})`, shadow: `brightness(${1 - fk})`,
-      fire: `sepia(${fk}) saturate(${1 + fk * 3}) brightness(${1 + fk * 0.3})` }[f.id] || `brightness(${1 + fk * 0.6})`;
+      fire: `sepia(${fk}) saturate(${1 + fk * 3}) brightness(${1 + fk * 0.3})`, poison: `hue-rotate(${fk * 80}deg) saturate(${1 + fk})`,
+      time: `grayscale(${fk})`, gold: `sepia(${fk}) saturate(${1 + fk * 2}) brightness(${1 + fk * 0.4})` }[f.id] || `brightness(${1 + fk * 0.6})`;
     else if (b.flash > 0) ctx.filter = 'brightness(1.8)';
     else if (b.windup > 0) ctx.filter = `sepia(${wk * 0.6}) saturate(${1 + wk * 2}) hue-rotate(-${wk * 25}deg) brightness(${1 + wk * 0.3})`;
     else if (b.slow > 0) ctx.filter = 'hue-rotate(160deg) saturate(0.6) brightness(1.3)';
@@ -2000,6 +2383,19 @@ function render(now) {
     if (bm.t < 0.5) drawSprite('🐲', S * 0.16, bm.head, bm.y, 0);
   }
   for (const h of G.homers) drawSprite('🌸', S * 0.045, h.x, h.y, h.rot);
+  for (const c of G.clouds) {
+    ctx.globalAlpha = 0.45 * Math.min(1, c.life / c.max * 2);
+    ctx.fillStyle = radial(ctx, c.x, c.y, 0, c.r * 1.3, [[0, 'rgba(128,237,153,0.9)'], [0.6, 'rgba(45,106,79,0.5)'], [1, 'rgba(45,106,79,0)']]);
+    circle(c.x, c.y, c.r * 1.3);
+  }
+  ctx.globalAlpha = 1;
+  for (const p of G.pillars) {
+    const a = p.life / p.max, w = S * 0.1;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a;
+    const gr = ctx.createLinearGradient(p.x - w, 0, p.x + w, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, p.color); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.fillRect(p.x - w, 0, w * 2, H); ctx.restore();
+  }
 
   for (const rg of G.rings) {
     const k = 1 - rg.life / rg.max;
@@ -2074,7 +2470,8 @@ function render(now) {
     ctx.fillText(`${G.boss.name}（${G.bossIndex + 1}/5）`, W / 2, H * 0.5 + S * 0.05);
     ctx.globalAlpha = 1;
   }
-  if (!f && G.timeScale < 0.95) { ctx.globalAlpha = (1 - G.timeScale) * 0.35; ctx.fillStyle = '#7fd3ff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (!f && G.freezeT > 0) { ctx.globalAlpha = 0.28; ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  else if (!f && G.timeScale < 0.95) { ctx.globalAlpha = (1 - G.timeScale) * 0.35; ctx.fillStyle = '#7fd3ff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (G.flash > 0) { ctx.globalAlpha = Math.min(0.85, G.flash * 2); ctx.fillStyle = G.flashColor; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
 }
 
@@ -2115,12 +2512,15 @@ function drawTrail(now) {
 
 const TRAIL_COLORS = { fire: ['#ffd166', '#ff6a00', '#ff2e00'], ice: ['#ffffff', '#a8e6ff'], thunder: ['#fff3a0', '#ffd60a'],
   wind: ['#ffffff', '#c7f9cc', '#57cc99'], shadow: ['#c77dff', '#7b2cbf', '#240046'], galaxy: ['#ffffff', '#a0c4ff', '#cdb4db', '#ffd166'],
-  dragon: ['#fff3b0', '#ffd60a', '#ff6a00'] };
+  dragon: ['#fff3b0', '#ffd60a', '#ff6a00'], poison: ['#e9ff70', '#80ed99', '#2d6a4f'], water: ['#ffffff', '#90e0ef', '#0077b6'],
+  gold: ['#fff3b0', '#ffd166'], holy: ['#ffffff', '#fff3b0'], time: ['#ffffff', '#cdb4db'] };
 function trailParticle(x, y) {
   const id = blade().id;
   if (id === 'basic' || Math.random() > 0.5) return;
   if (id === 'love') { if (Math.random() < 0.3) addPart({ x, y, vx: (Math.random() - 0.5) * S * 0.2, vy: -S * 0.1, life: 0.6, max: 0.6, e: '💗', size: S * 0.03, g: -0.05, rot: 0 }); return; }
   if (id === 'sakura') { addPart({ x, y, vx: (Math.random() - 0.5) * S * 0.3, vy: S * 0.05, life: 0.7, max: 0.7, kind: 'petal', color: Math.random() < 0.5 ? '#ffc8dd' : '#ff8fab', size: S * 0.01, g: 0.15, rot: Math.random() * 6 }); return; }
+  if (id === 'candy') { if (Math.random() < 0.2) addPart({ x, y, vx: 0, vy: S * 0.1, life: 0.5, max: 0.5, e: ['🍬', '🍭'][Math.random() * 2 | 0], size: S * 0.025, g: 0.2, rot: 0 }); return; }
+  if (id === 'angel') { addPart({ x, y, vx: (Math.random() - 0.5) * S * 0.2, vy: S * 0.05, life: 0.7, max: 0.7, kind: 'petal', color: '#ffffff', size: S * 0.01, g: 0.1, rot: Math.random() * 6 }); return; }
   if (id === 'galaxy' && Math.random() < 0.15) { addPart({ x, y, vx: 0, vy: 0, life: 0.5, max: 0.5, e: '✨', size: S * 0.025, g: 0, rot: 0 }); return; }
   const col = TRAIL_COLORS[id]; if (!col) return;
   addPart({ x, y, vx: (Math.random() - 0.5) * S * 0.3, vy: (id === 'fire' || id === 'dragon' ? -1 : 0.2) * S * 0.3 * Math.random(), life: 0.35, max: 0.35, color: col[Math.random() * col.length | 0], size: S * (0.004 + Math.random() * 0.006), g: id === 'ice' ? 0.3 : 0, kind: id === 'shadow' ? 'ghost' : undefined });
@@ -2163,7 +2563,7 @@ cv.addEventListener('pointercancel', endStroke);
 
 // ===== 介面 =====
 const $ = id => document.getElementById(id);
-const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear', 'cloud', 'nameset'];
+const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear', 'cloud', 'nameset', 'checkin', 'whatsnew'];
 let shopReturn = 'menu', curStage = 0;
 function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', !(state === 'play' || state === 'paused')); }
 
@@ -2173,14 +2573,16 @@ function updateHUD() {
   $('best-hud').textContent = '最高 ' + Math.max(save.stageBest[G.stage] || 0, G.score);
   $('stage-hud').textContent = `${G.st.icon} ${G.st.name}・Boss ${G.bossIndex}/5`;
   const slots = Math.max(START_HEARTS + perkLvl('life'), G.hearts);
-  $('hearts').textContent = '❤️'.repeat(Math.max(0, G.hearts)) + '🤍'.repeat(Math.max(0, slots - G.hearts));
+  $('hearts').textContent = '❤️'.repeat(Math.max(0, G.hearts)) + '🤍'.repeat(Math.max(0, slots - G.hearts)) + (G.shield ? '🛡️' : '');
   $('coins-hud').textContent = '💰 ' + save.coins;
   const b = blade();
   $('blade-hud').textContent = `${b.icon} ${b.name} Lv.${bladeLvl()}`;
 }
 function goMenu() {
   if (!save.cloud || !save.cloud.name) return openNameSet();
-  dailyReward();
+  // 今天還沒簽到：這次開遊戲第一次回主選單時自動打開簽到頁
+  if (canCheckin() && !checkinAuto) { checkinAuto = true; return openCheckin(); }
+  $('btn-checkin-open').textContent = canCheckin() ? '📅 每日簽到 ❗' : '📅 每日簽到';
   state = 'menu'; G = null;
   $('menu-title').textContent = CONFIG.title;
   $('menu-sub').textContent = `專屬 ${CONFIG.herName} 的切水果遊戲 💕`;
@@ -2188,17 +2590,40 @@ function goMenu() {
   $('boss-bar').classList.add('hidden');
   show('menu');
 }
-// 每日登入獎勵：每天第一次回到主選單時發放；連續天數越多越多（最多 7 天）
-function dailyReward() {
-  const d = new Date(), today = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-  const y = new Date(d - 864e5), yesterday = `${y.getFullYear()}-${y.getMonth() + 1}-${y.getDate()}`;
-  const daily = save.daily || {};
-  if (daily.last === today) return;
-  const streak = daily.last === yesterday ? Math.min(7, (daily.streak || 0) + 1) : 1;
-  const gift = 100 + 50 * (streak - 1);
-  save.daily = { last: today, streak }; save.coins += gift; persist();
-  const el = $('daily'); el.textContent = `🎁 每日登入第 ${streak} 天：+${gift} 💰` + (streak < 7 ? `（明天 +${gift + 50}）` : '');
-  el.classList.remove('hidden'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 4500);
+// ===== 每日簽到：累積 30 天可以領「天使之刃」（漏簽不會重來） =====
+const CHECKIN_DAYS = 30;
+let checkinAuto = false;
+const checkinReward = day => day === CHECKIN_DAYS ? { blade: 'angel' } : day % 7 === 0 ? { coins: 500 } : { coins: 100 + 20 * ((day - 1) % 7) };
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
+function canCheckin() { return !save.checkin || save.checkin.last !== todayStr(); }
+function openCheckin() { state = 'checkin'; G = null; $('checkin-msg').textContent = ''; renderCheckin(); show('checkin'); }
+function renderCheckin() {
+  const done = save.checkin ? save.checkin.days : 0, todayDone = !canCheckin();
+  $('checkin-title').textContent = done >= CHECKIN_DAYS ? '已完成 30 天簽到 🎉 之後每天簽到 +300 💰' : `已累積簽到 ${done} / ${CHECKIN_DAYS} 天`;
+  const grid = $('checkin-grid'); grid.innerHTML = '';
+  for (let d = 1; d <= CHECKIN_DAYS; d++) {
+    const rw = checkinReward(d), cell = document.createElement('div');
+    cell.className = 'day' + (d <= done ? ' done' : '') + (d === done + 1 && !todayDone ? ' today' : '') + (rw.blade ? ' special' : '');
+    cell.innerHTML = `<div class="dn">第 ${d} 天</div><div class="dr">${rw.blade ? '👼' : '💰'}</div><div class="dv">${rw.blade ? '天使之刃' : rw.coins}</div>`;
+    grid.appendChild(cell);
+  }
+  const bt = $('btn-checkin');
+  bt.disabled = todayDone;
+  bt.textContent = todayDone ? '今天已簽到 ✅' : done >= CHECKIN_DAYS ? '簽到 +300 💰' : `簽到（第 ${done + 1} 天）`;
+}
+function doCheckin() {
+  if (!canCheckin()) return;
+  const day = (save.checkin ? save.checkin.days : 0) + 1;
+  let msg;
+  if (day > CHECKIN_DAYS) { save.coins += 300; msg = '✅ 簽到成功 +300 💰'; }
+  else {
+    const rw = checkinReward(day);
+    if (rw.blade) { save.owned.angel = true; save.levels.angel = save.levels.angel || 1; msg = '👼 恭喜獲得限定神刀「天使之刃」！到商店裝備吧'; }
+    else { save.coins += rw.coins; msg = `✅ 第 ${day} 天簽到成功 +${rw.coins} 💰`; }
+  }
+  save.checkin = { days: day, last: todayStr() };
+  persist(); sfx.win(); renderCheckin();
+  $('checkin-msg').textContent = msg;
 }
 function openStages() { state = 'stages'; renderStages(); show('stages'); }
 function renderStages() {
@@ -2381,6 +2806,40 @@ $('btn-restore').onclick = async () => {
   } catch (e) { $('restore-msg').textContent = '❌ ' + e.message; restoreArmed = false; $('btn-restore').textContent = '恢復進度'; }
 };
 
+// ===== 開場讀取畫面：載入字型、封面、水果圖、雲端存檔；更新後顯示「更新內容」 =====
+async function boot() {
+  const step = (v, s) => { $('load-bar').style.width = v + '%'; $('load-text').textContent = s; };
+  const wait = ms => new Promise(res => setTimeout(res, ms));
+  const t0 = performance.now();
+  $('load-ver').textContent = 'v' + VERSION;
+  step(10, '準備畫面中…');
+  await Promise.race([document.fonts ? document.fonts.ready : Promise.resolve(), wait(1500)]);
+  step(30, '載入封面…');
+  await Promise.race([new Promise(res => { const img = new Image(); img.onload = img.onerror = res; img.src = 'cover-bg.jpg'; }), wait(3000)]);
+  step(55, '準備水果…');
+  for (const f of FRUITS) { art('s', f.id, S * 0.075 * (f.s || 1)); art('f', f.id, S * 0.075 * (f.s || 1)); await wait(0); }
+  step(80, '連線雲端存檔…');
+  await Promise.race([cloudInit(), wait(4000)]);
+  step(100, '完成！');
+  await wait(Math.max(200, 900 - (performance.now() - t0)));
+  $('loading').classList.add('fade'); setTimeout(() => $('loading').classList.add('hidden'), 400);
+  // 老玩家（已經有暱稱）更新到新版本時，先看更新內容
+  if (save.cloud && save.seenVersion !== VERSION && CHANGELOG[VERSION]) return showWhatsNew();
+  save.seenVersion = VERSION; persist();
+  goMenu();
+}
+function showWhatsNew() {
+  state = 'whatsnew';
+  $('wn-title').textContent = `🎉 已更新到 v${VERSION}`;
+  $('wn-list').innerHTML = '';
+  for (const line of CHANGELOG[VERSION]) { const li = document.createElement('li'); li.textContent = line; $('wn-list').appendChild(li); }
+  show('whatsnew');
+}
+$('btn-wn-ok').onclick = () => { audio(); save.seenVersion = VERSION; persist(); goMenu(); };
+$('btn-checkin').onclick = () => { audio(); doCheckin(); };
+$('btn-checkin-back').onclick = () => goMenu();
+$('btn-checkin-open').onclick = () => { audio(); openCheckin(); };
+
 // ===== 主迴圈 =====
 let last = performance.now();
 function loop(now) {
@@ -2389,9 +2848,8 @@ function loop(now) {
   render(now);
   requestAnimationFrame(loop);
 }
-goMenu();
 requestAnimationFrame(loop);
-cloudInit();
+boot();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
