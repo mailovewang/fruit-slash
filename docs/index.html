@@ -375,6 +375,7 @@ async function cloudInit() {
     const fs = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`);
     CLOUD.api = fs; CLOUD.db = fs.getFirestore(app.initializeApp(cfg)); CLOUD.ready = true; CLOUD.state = 'syncing';
     await cloudSync();
+    if (CLOUD.state === 'syncing') CLOUD.state = 'ok'; // 還沒取暱稱時沒有東西要同步
   } catch (e) { CLOUD.state = 'offline'; }
   if (state === 'cloud') renderCloud();
 }
