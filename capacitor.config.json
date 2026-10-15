@@ -1,6 +1,13 @@
 {
-  "appId": "com.love.fruitslash",
+  "appId": "com.mailovewang.fruitslash",
   "appName": "寶貝切切樂",
   "webDir": "docs",
-  "backgroundColor": "#14081a"
+  "backgroundColor": "#14081a",
+  "server": {
+    "url": "https://mailovewang.github.io/fruit-slash/",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
 }

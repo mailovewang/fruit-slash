@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">寶貝切切樂</string>
+    <string name="title_activity_main">寶貝切切樂</string>
+    <string name="package_name">com.mailovewang.fruitslash</string>
+    <string name="custom_url_scheme">com.mailovewang.fruitslash</string>
+</resources>
