@@ -495,9 +495,12 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.7.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '1.7.2'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.7.2': [
+    '🛠️ 修正手機一直停在舊版本的問題：現在每次打開都會抓最新版，沒網路時才用離線版本',
+  ],
   '1.7.1': [
     '🔄 新增自動檢查更新：有新版本時，畫面上方會出現「有新版本，點這裡更新」，點一下就會更新',
   ],
@@ -3196,7 +3199,13 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 boot();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+// 離線快取：sw.js 每次都抓最新的；換成新版快取程式時自動重新整理一次，馬上用到最新版
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const hadController = !!navigator.serviceWorker.controller;
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || swReloaded) return; swReloaded = true; location.reload(); });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => reg.update()).catch(() => {});
+}
 </script>
 </body>
 </html>
