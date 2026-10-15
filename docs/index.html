@@ -435,9 +435,13 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.6.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
+const VERSION = '1.6.1'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.6.1': [
+    '🐉 修正龍神刀：龍頭改成朝著飛行方向，身體和背鰭跟著彎曲，龍息的龍頭也一樣',
+    '👼 修正天使之刃：翅膀改成從 Boss 後面展開，不會擋住 Boss',
+  ],
   '1.6.0': [
     '🗡️ 新增 6 把刀：毒液刀、水流刀、黃金刀、聖光刀、時空刀、糖果刀，每把都有專屬特效和擊殺技',
     '👼 新增限定神刀「天使之刃」：每日簽到累積 30 天就能領取',
@@ -2162,6 +2166,25 @@ function drawFinisherUnder(f, now) {
     ctx.globalAlpha = 0.5 * a; ctx.fillStyle = radial(ctx, f.x, f.y, 0, s * 1.4, [[0, 'rgba(255,92,138,0.9)'], [1, 'rgba(255,92,138,0)']]);
     heartPath(f.x, f.y + s * 0.2, s); ctx.fill(); ctx.globalAlpha = 1;
   }
+  // 天使翅膀畫在 Boss 後面（這裡是 Boss 底下那一層）
+  { const { x, y, r } = f;
+    if (f.id === 'angel' && t < f.brk + 0.4) {
+      // 天使的翅膀：從 Boss 兩側展開
+      const k2 = Math.min(1, t / f.brk), flap = Math.sin(now / 120) * 0.15;
+      ctx.save(); ctx.globalAlpha = 0.85 * (t < f.brk ? 1 : 1 - (t - f.brk) / 0.4);
+      for (const side of [-1, 1]) {
+        ctx.save(); ctx.translate(x + side * r * 0.6, y - r * 0.2); ctx.scale(side, 1); ctx.rotate(-0.3 - flap);
+        for (let i = 0; i < 6; i++) {
+          ctx.save(); ctx.rotate(-i * 0.22);
+          const len = r * (1.6 - i * 0.12) * k2;
+          ctx.fillStyle = vgrad(-r * 0.13, r * 0.13, [[0, '#ffffff'], [1, '#ffe8a3']]);
+          ctx.beginPath(); ctx.ellipse(len * 0.5, 0, Math.max(1, len * 0.5), r * 0.13, 0, 0, 7); ctx.fill(); ctx.restore();
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+    }
   if (f.id === 'time') {
     ctx.globalAlpha = 0.35 * a; ctx.fillStyle = '#8a8a8a'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
     drawSprite('⏳', S * 0.5, W / 2, H / 2, 0, 0.12 * a);
@@ -2214,17 +2237,25 @@ function drawFinisherOver(f, now) {
   }
   if (f.id === 'dragon' && t < f.brk + 0.35) {
     // 龍身：一串金色鱗片圓，從尾巴到頭越來越粗
-    for (let i = 26; i >= 0; i--) {
-      const p = dragonHead(f, i * 0.022);
+    for (let i = 26; i >= 1; i--) {
+      const p = dragonHead(f, i * 0.022), q = dragonHead(f, i * 0.022 - 0.01);
       if (p.u < 0) continue;
-      const rr = r * 0.32 * (1 - i / 34);
+      const rr = r * 0.38 * (1 - i / 34), a = Math.atan2(q.y - p.y, q.x - p.x); // a = 這一節往前的方向
       ctx.globalAlpha = 1;
       ctx.fillStyle = radial(ctx, p.x - rr * 0.3, p.y - rr * 0.3, 0, rr, [[0, '#fff3b0'], [0.5, '#ffd60a'], [1, '#b8860b']]);
       circle(p.x, p.y, rr);
-      if (i % 3 === 0) { ctx.fillStyle = '#e85d04'; ctx.beginPath(); ctx.moveTo(p.x - rr * 0.5, p.y - rr * 0.8); ctx.lineTo(p.x, p.y - rr * 1.6); ctx.lineTo(p.x + rr * 0.5, p.y - rr * 0.8); ctx.fill(); }
+      // 背鰭：長在這一節的「上方」（垂直於前進方向），跟著身體彎曲
+      if (i % 3 === 0) {
+        const nx = Math.sin(a), ny = -Math.cos(a);
+        ctx.fillStyle = '#e85d04'; ctx.beginPath();
+        ctx.moveTo(p.x + nx * rr * 0.8 - Math.cos(a) * rr * 0.5, p.y + ny * rr * 0.8 - Math.sin(a) * rr * 0.5);
+        ctx.lineTo(p.x + nx * rr * 1.6 - Math.cos(a) * rr * 0.3, p.y + ny * rr * 1.6 - Math.sin(a) * rr * 0.3);
+        ctx.lineTo(p.x + nx * rr * 0.8 + Math.cos(a) * rr * 0.5, p.y + ny * rr * 0.8 + Math.sin(a) * rr * 0.5);
+        ctx.fill();
+      }
     }
-    const hd = dragonHead(f), nx = dragonHead(f, -0.02);
-    drawSprite('🐲', r * 1.3, hd.x, hd.y, Math.atan2(nx.y - hd.y, nx.x - hd.x) * 0.5);
+    const hd = dragonHead(f), ahead = dragonHead(f, -0.01);
+    drawDragonHead(hd.x, hd.y, Math.atan2(ahead.y - hd.y, ahead.x - hd.x), r * 0.95);
   }
   ctx.restore();
 
@@ -2242,22 +2273,6 @@ function drawFinisherOver(f, now) {
     ctx.beginPath(); ctx.moveTo(0, y + hgt);
     for (let xx = 0; xx <= W; xx += 10) ctx.lineTo(xx, y - hgt * 0.6 + Math.sin(xx * 0.02 + now / 80) * hgt * 0.3);
     ctx.lineTo(W, y + hgt); ctx.closePath(); ctx.fill(); ctx.restore();
-  }
-  if (f.id === 'angel' && t < f.brk + 0.4) {
-    // 天使的翅膀：從 Boss 兩側展開
-    const k2 = Math.min(1, t / f.brk), flap = Math.sin(now / 120) * 0.15;
-    ctx.save(); ctx.globalAlpha = 0.85 * (t < f.brk ? 1 : 1 - (t - f.brk) / 0.4);
-    for (const side of [-1, 1]) {
-      ctx.save(); ctx.translate(x + side * r * 0.6, y - r * 0.2); ctx.scale(side, 1); ctx.rotate(-0.3 - flap);
-      for (let i = 0; i < 6; i++) {
-        ctx.save(); ctx.rotate(-i * 0.22);
-        const len = r * (1.6 - i * 0.12) * k2;
-        ctx.fillStyle = vgrad(-r * 0.13, r * 0.13, [[0, '#ffffff'], [1, '#ffe8a3']]);
-        ctx.beginPath(); ctx.ellipse(len * 0.5, 0, Math.max(1, len * 0.5), r * 0.13, 0, 0, 7); ctx.fill(); ctx.restore();
-      }
-      ctx.restore();
-    }
-    ctx.restore();
   }
   // 招式名稱
   if (t > 0.05 && t < f.dur) {
@@ -2380,7 +2395,7 @@ function render(now) {
     ctx.fillStyle = vgrad(bm.y - band, bm.y + band, [[0, 'rgba(255,80,0,0)'], [0.35, 'rgba(255,140,0,0.7)'], [0.5, 'rgba(255,240,180,0.95)'], [0.65, 'rgba(255,140,0,0.7)'], [1, 'rgba(255,80,0,0)']]);
     ctx.fillRect(0, bm.y - band, Math.max(0, bm.head), band * 2);
     ctx.restore();
-    if (bm.t < 0.5) drawSprite('🐲', S * 0.16, bm.head, bm.y, 0);
+    if (bm.t < 0.5) drawDragonHead(bm.head, bm.y, 0, S * 0.11); // 龍頭朝右飛，火焰留在後面
   }
   for (const h of G.homers) drawSprite('🌸', S * 0.045, h.x, h.y, h.rot);
   for (const c of G.clouds) {
@@ -2473,6 +2488,41 @@ function render(now) {
   if (!f && G.freezeT > 0) { ctx.globalAlpha = 0.28; ctx.fillStyle = '#7d7d7d'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   else if (!f && G.timeScale < 0.95) { ctx.globalAlpha = (1 - G.timeScale) * 0.35; ctx.fillStyle = '#7fd3ff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
   if (G.flash > 0) { ctx.globalAlpha = Math.min(0.85, G.flash * 2); ctx.fillStyle = G.flashColor; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+}
+
+// 龍頭（側面）：本身朝 +x 方向，ang 是飛行方向；往左飛時上下翻轉，讓角永遠在上面
+function drawDragonHead(x, y, ang, s) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); if (Math.cos(ang) < 0) ctx.scale(1, -1);
+  // 角：往後上方彎
+  ctx.strokeStyle = '#f1e3c4'; ctx.lineCap = 'round'; ctx.lineWidth = s * 0.12;
+  for (const k of [0, 1]) { ctx.beginPath(); ctx.moveTo(-s * 0.15 - k * s * 0.15, -s * 0.3); ctx.quadraticCurveTo(-s * 0.55 - k * s * 0.1, -s * 0.55, -s * 0.95 - k * s * 0.1, -s * 0.55 + k * s * 0.15); ctx.stroke(); }
+  // 鬃毛：頭後方往後飄的紅色尖刺
+  ctx.fillStyle = '#d00000';
+  for (let i = 0; i < 4; i++) { const yy = -s * 0.25 + i * s * 0.17; ctx.beginPath(); ctx.moveTo(-s * 0.35, yy - s * 0.08); ctx.lineTo(-s * 0.95 - (i % 2) * s * 0.15, yy + s * 0.02); ctx.lineTo(-s * 0.35, yy + s * 0.1); ctx.fill(); }
+  // 下顎（張嘴）與嘴巴內部
+  ctx.fillStyle = radial(ctx, s * 0.3, s * 0.25, 0, s * 0.6, [[0, '#ffd60a'], [1, '#b8860b']]);
+  ctx.beginPath(); ctx.moveTo(-s * 0.2, s * 0.1); ctx.quadraticCurveTo(s * 0.4, s * 0.45, s * 0.95, s * 0.32); ctx.quadraticCurveTo(s * 0.5, s * 0.18, -s * 0.1, s * 0.05); ctx.fill();
+  ctx.fillStyle = '#7a0010';
+  ctx.beginPath(); ctx.moveTo(-s * 0.05, s * 0.06); ctx.quadraticCurveTo(s * 0.45, s * 0.28, s * 0.9, s * 0.28); ctx.lineTo(s * 0.9, s * 0.12); ctx.quadraticCurveTo(s * 0.45, s * 0.1, -s * 0.05, s * 0.06); ctx.fill();
+  // 頭與上顎：長吻朝前
+  ctx.fillStyle = radial(ctx, -s * 0.1, -s * 0.2, 0, s * 1.1, [[0, '#fff3b0'], [0.45, '#ffd60a'], [1, '#c77700']]);
+  ctx.beginPath(); ctx.moveTo(-s * 0.45, -s * 0.05);
+  ctx.quadraticCurveTo(-s * 0.4, -s * 0.42, 0, -s * 0.38); ctx.quadraticCurveTo(s * 0.45, -s * 0.32, s * 1.05, -s * 0.05);
+  ctx.quadraticCurveTo(s * 1.12, s * 0.08, s * 0.95, s * 0.14); ctx.quadraticCurveTo(s * 0.4, s * 0.12, -s * 0.2, s * 0.15);
+  ctx.quadraticCurveTo(-s * 0.48, s * 0.12, -s * 0.45, -s * 0.05); ctx.fill();
+  // 牙齒、鼻孔
+  ctx.fillStyle = '#ffffff';
+  for (const tx of [0.35, 0.55, 0.75]) { ctx.beginPath(); ctx.moveTo(s * tx, s * 0.13); ctx.lineTo(s * (tx + 0.05), s * 0.22); ctx.lineTo(s * (tx + 0.1), s * 0.13); ctx.fill(); }
+  ctx.fillStyle = '#7a3e00'; ctx.beginPath(); ctx.ellipse(s * 0.92, -s * 0.06, s * 0.04, s * 0.025, 0.3, 0, 7); ctx.fill();
+  // 眼睛看向前方 + 怒眉
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(s * 0.12, -s * 0.18, s * 0.12, s * 0.08, -0.2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#d00000'; ctx.beginPath(); ctx.arc(s * 0.17, -s * 0.18, s * 0.05, 0, 7); ctx.fill();
+  ctx.fillStyle = '#000000'; ctx.beginPath(); ctx.ellipse(s * 0.18, -s * 0.18, s * 0.015, s * 0.045, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#7a3e00'; ctx.lineWidth = s * 0.05; ctx.beginPath(); ctx.moveTo(-s * 0.02, -s * 0.33); ctx.lineTo(s * 0.3, -s * 0.24); ctx.stroke();
+  // 鬍鬚往後飄
+  ctx.strokeStyle = '#fff3b0'; ctx.lineWidth = s * 0.03;
+  for (const k of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 0.85, s * 0.02); ctx.quadraticCurveTo(s * 0.3, s * (0.5 + k * 0.1), -s * 0.6, s * (0.35 + k * 0.15)); ctx.stroke(); }
+  ctx.restore();
 }
 
 // Boss 的生氣臉：眼白、跟著動的黑眼珠、八字眉；蓄力或狂暴時嘴巴張開
@@ -2824,15 +2874,22 @@ async function boot() {
   await wait(Math.max(200, 900 - (performance.now() - t0)));
   $('loading').classList.add('fade'); setTimeout(() => $('loading').classList.add('hidden'), 400);
   // 老玩家（已經有暱稱）更新到新版本時，先看更新內容
-  if (save.cloud && save.seenVersion !== VERSION && CHANGELOG[VERSION]) return showWhatsNew();
+  if (save.cloud && save.seenVersion !== VERSION && missedVersions().length) return showWhatsNew();
   save.seenVersion = VERSION; persist();
   goMenu();
 }
+// 比玩家上次看過的版本還新的所有版本（新的在前），跳過好幾版也不會漏看
+const verNum = v => (v || '0').split('.').reduce((a, n) => a * 1000 + (+n || 0), 0);
+function missedVersions() { return Object.keys(CHANGELOG).filter(v => verNum(v) > verNum(save.seenVersion) && verNum(v) <= verNum(VERSION)).sort((a, b) => verNum(b) - verNum(a)); }
 function showWhatsNew() {
   state = 'whatsnew';
   $('wn-title').textContent = `🎉 已更新到 v${VERSION}`;
   $('wn-list').innerHTML = '';
-  for (const line of CHANGELOG[VERSION]) { const li = document.createElement('li'); li.textContent = line; $('wn-list').appendChild(li); }
+  const vs = missedVersions();
+  for (const v of vs) {
+    if (vs.length > 1) { const hd = document.createElement('li'); hd.textContent = 'v' + v; hd.style.cssText = 'list-style:none;margin-left:-1.2em;color:var(--gold);font-weight:900;margin-top:6px'; $('wn-list').appendChild(hd); }
+    for (const line of CHANGELOG[v]) { const li = document.createElement('li'); li.textContent = line; $('wn-list').appendChild(li); }
+  }
   show('whatsnew');
 }
 $('btn-wn-ok').onclick = () => { audio(); save.seenVersion = VERSION; persist(); goMenu(); };
