@@ -185,6 +185,9 @@
   .tile.eq { border-color: var(--gold); }
   .tile.locked img, .tile.locked .ti { filter: grayscale(1) brightness(.55); }
   .detail .card .icon img { width: 72px; height: 72px; }
+  #update-bar { position: fixed; z-index: 30; left: 50%; top: calc(env(safe-area-inset-top) + 8px); transform: translateX(-50%); border: none; cursor: pointer;
+    background: linear-gradient(180deg, #ffd166, #f4a300); color: #4a2a00; font: inherit; font-weight: 900; font-size: 15px; padding: 8px 18px; border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4); animation: pulse 1.2s infinite; }
   #scroll-hint { position: fixed; z-index: 15; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 6px); transform: translateX(-50%); pointer-events: none;
     background: rgba(255,92,138,.92); color: #fff; font-weight: 800; font-size: 13px; padding: 4px 14px; border-radius: 999px; animation: hintbob 1s ease-in-out infinite; }
   @keyframes hintbob { 50% { transform: translate(-50%, -4px); } }
@@ -223,6 +226,7 @@
 <body>
 <canvas id="c"></canvas>
 <div id="scroll-hint" class="hidden">⬇ 往下滑還有更多</div>
+<button id="update-bar" class="hidden"></button>
 
 <div id="loading">
   <h1 class="title">寶貝切切樂</h1>
@@ -491,9 +495,12 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.7.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
+const VERSION = '1.7.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.7.1': [
+    '🔄 新增自動檢查更新：有新版本時，畫面上方會出現「有新版本，點這裡更新」，點一下就會更新',
+  ],
   '1.7.0': [
     '🗡️ 每把刀都換上專屬插圖：妖刀、龍神偃月刀、天使聖劍、糖果劍……不再只是小圖示',
     '🛒 商店改成「左邊選刀、右邊看詳細」，一個畫面就看得到全部的刀，不用一直往下滑',
@@ -3131,11 +3138,13 @@ async function boot() {
   step(100, '完成！');
   await wait(Math.max(200, 900 - (performance.now() - t0)));
   $('loading').classList.add('fade'); setTimeout(() => $('loading').classList.add('hidden'), 400);
+  checkUpdate();
   // 老玩家（已經有暱稱）更新到新版本時，先看更新內容
   if (save.cloud && save.seenVersion !== VERSION && missedVersions().length) return showWhatsNew();
   save.seenVersion = VERSION; persist();
   goMenu();
 }
+
 // 比玩家上次看過的版本還新的所有版本（新的在前），跳過好幾版也不會漏看
 const verNum = v => (v || '0').split('.').reduce((a, n) => a * 1000 + (+n || 0), 0);
 function missedVersions() { return Object.keys(CHANGELOG).filter(v => verNum(v) > verNum(save.seenVersion) && verNum(v) <= verNum(VERSION)).sort((a, b) => verNum(b) - verNum(a)); }
@@ -3154,6 +3163,28 @@ $('btn-wn-ok').onclick = () => { audio(); save.seenVersion = VERSION; persist();
 $('btn-checkin').onclick = () => { audio(); doCheckin(); };
 $('btn-checkin-back').onclick = () => goMenu();
 $('btn-checkin-open').onclick = () => { audio(); openCheckin(); };
+
+// ===== 自動檢查新版本：開遊戲、從背景回來、每 5 分鐘各檢查一次 =====
+let updateReady = null;
+async function checkUpdate() {
+  try {
+    const res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    const v = (await res.json()).version;
+    if (v && verNum(v) > verNum(VERSION)) {
+      updateReady = v;
+      const bar = $('update-bar'); bar.textContent = `🔄 有新版本 v${v}，點這裡更新`; bar.classList.remove('hidden');
+    }
+  } catch (e) {}
+}
+$('update-bar').onclick = () => {
+  persist(); cloudSync();
+  $('update-bar').textContent = '更新中…';
+  // 先清掉離線快取，再帶著版本號重新載入，確保拿到最新的檔案
+  const go = () => location.replace(location.pathname + '?v=' + updateReady);
+  if (window.caches) caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go, go); else go();
+};
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+setInterval(checkUpdate, 5 * 60 * 1000);
 
 // ===== 主迴圈 =====
 let last = performance.now();
