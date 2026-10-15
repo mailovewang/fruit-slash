@@ -164,10 +164,65 @@
         #score { font-size: 32px; }
     #pause-btn { top: calc(env(safe-area-inset-top) + 82px); }
   }
+  /* ===== 手機一頁放得下的版面 ===== */
+  #shop { overflow-y: auto; gap: 8px; justify-content: flex-start; }
+  .shop-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; width: 100%; max-width: 980px; }
+  .shop-head h2 { margin: 0; font-size: 22px; }
+  .shop-head .stat { margin: 0; }
+  .shop-head .tabs { width: auto; flex: 1; max-width: 340px; }
+  .shop-head .tab { padding: 7px 10px; font-size: 14px; }
+  .btn.small { min-width: 0; padding: 7px 14px; font-size: 14px; box-shadow: none; }
+  .shop-body { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 980px; }
+  #shop-list.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; max-width: none; align-content: start; }
+  .tile { pointer-events: auto; position: relative; border: 2px solid rgba(255,158,192,.22); border-radius: 12px; background: var(--panel); color: #fff;
+    font: inherit; padding: 3px 2px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+  .tile img { width: 44px; height: 44px; }
+  .tile .ti { font-size: 30px; line-height: 44px; }
+  .tile .tn { font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tile .ts { font-size: 10px; color: var(--gold); }
+  .tile .tb { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); background: var(--gold); color: #4a2a00; font-size: 9px; font-weight: 900; border-radius: 6px; padding: 0 4px; white-space: nowrap; }
+  .tile.sel { border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,.45); background: #3a1a4a; }
+  .tile.eq { border-color: var(--gold); }
+  .tile.locked img, .tile.locked .ti { filter: grayscale(1) brightness(.55); }
+  .detail .card .icon img { width: 72px; height: 72px; }
+  #scroll-hint { position: fixed; z-index: 15; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 6px); transform: translateX(-50%); pointer-events: none;
+    background: rgba(255,92,138,.92); color: #fff; font-weight: 800; font-size: 13px; padding: 4px 14px; border-radius: 999px; animation: hintbob 1s ease-in-out infinite; }
+  @keyframes hintbob { 50% { transform: translate(-50%, -4px); } }
+  @media (orientation: landscape) {
+    .shop-head { flex-wrap: nowrap; }
+    .shop-body { flex-direction: row; align-items: flex-start; }
+    #shop-list.tiles { width: 54%; grid-template-columns: repeat(6, 1fr); }
+    .detail { flex: 1; min-width: 0; }
+    .detail .card { grid-template-columns: 64px 1fr; padding: 10px 12px; }
+    .detail .card .icon { grid-row: 1 / span 3; }
+    .detail .card .name, .detail .card .desc, .detail .card .fx { grid-column: 2; }
+    .detail .card .actions { grid-column: 1 / -1; grid-row: auto; flex-direction: row; margin-top: 8px; }
+    .detail .card .desc { font-size: 12px; } .detail .card .fx { font-size: 11px; }
+    #stage-list { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .stage { grid-template-columns: 1fr; text-align: center; padding: 8px 4px; gap: 2px; }
+    .stage .s-icon { grid-row: auto; font-size: 28px; }
+    .stage .s-go { display: none; }
+    .stage .s-name { font-size: 14px; line-height: 1.25; }
+    .stage .s-info { font-size: 10px; }
+  }
+  @media (orientation: landscape) and (max-height: 600px) {
+    .ck-head { display: flex; align-items: baseline; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .ck-head .stat { margin: 0; }
+    .ck-desc { display: none; }
+    #checkin { gap: 6px; }
+    #checkin-grid { gap: 4px; }
+    .day { padding: 1px 0; font-size: 10px; }
+    .day .dr { font-size: 13px; }
+    #checkin-msg { margin: 0; min-height: 0; }
+    #stages h2 { font-size: 20px; }
+    #cloud { gap: 6px; }
+    .wn-box ul { max-height: 48vh; }
+  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="scroll-hint" class="hidden">⬇ 往下滑還有更多</div>
 
 <div id="loading">
   <h1 class="title">寶貝切切樂</h1>
@@ -210,7 +265,7 @@
 
 <div id="cloud" class="screen hidden">
   <h2>☁️ 雲端存檔</h2>
-  <div class="cloud-box">
+  <div class="cloud-box" id="cloud-main">
     <p class="stat">暱稱：<b id="cloud-name"></b></p>
     <p class="stat">你的恢復碼（請截圖保存，刪除遊戲後可以用它找回進度）</p>
     <div id="cloud-code" class="code">—</div>
@@ -230,9 +285,8 @@
 </div>
 
 <div id="checkin" class="screen hidden">
-  <h2>📅 每日簽到</h2>
-  <p class="stat" id="checkin-title"></p>
-  <p class="stat">累積簽到 30 天可以領取限定神刀 👼「天使之刃」！漏簽一天不會重來</p>
+  <div class="ck-head"><h2>📅 每日簽到</h2><p class="stat" id="checkin-title"></p></div>
+  <p class="stat ck-desc">累積簽到 30 天可以領取限定神刀 👼「天使之刃」！漏簽一天不會重來</p>
   <div id="checkin-grid"></div>
   <p class="stat" id="checkin-msg"></p>
   <div class="btn-row"><button class="btn" id="btn-checkin">簽到</button><button class="btn ghost" id="btn-checkin-back">返回</button></div>
@@ -264,11 +318,13 @@
 </div>
 
 <div id="shop" class="screen hidden">
-  <h2>🛒 商店</h2>
-  <p class="stat">金幣 <b id="shop-coins">0</b></p>
-  <div class="tabs"><button class="tab active" data-tab="blades">🔪 刀具</button><button class="tab" data-tab="perks">⭐ 能力強化</button></div>
-  <div id="shop-list"></div>
-  <button class="btn ghost" id="btn-shop-back">返回</button>
+  <div class="shop-head">
+    <button class="btn ghost small" id="btn-shop-back">← 返回</button>
+    <h2>🛒 商店</h2>
+    <span class="stat">💰 <b id="shop-coins">0</b></span>
+    <div class="tabs"><button class="tab active" data-tab="blades">🔪 刀具</button><button class="tab" data-tab="perks">⭐ 能力強化</button></div>
+  </div>
+  <div class="shop-body"><div id="shop-list" class="tiles"></div><div id="shop-detail" class="detail"></div></div>
 </div>
 
 <div id="pause" class="screen hidden">
@@ -435,9 +491,15 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.6.1'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
+const VERSION = '1.7.0'; // 每次更新遊戲就把這個數字加一點，主選單會顯示
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.7.0': [
+    '🗡️ 每把刀都換上專屬插圖：妖刀、龍神偃月刀、天使聖劍、糖果劍……不再只是小圖示',
+    '🛒 商店改成「左邊選刀、右邊看詳細」，一個畫面就看得到全部的刀，不用一直往下滑',
+    '📱 簽到、選關卡、雲端存檔都縮成一頁，手機橫拿就看得到全部按鈕',
+    '⬇ 如果畫面還有東西在下面，底部會出現「往下滑還有更多」的提示',
+  ],
   '1.6.1': [
     '🐉 修正龍神刀：龍頭改成朝著飛行方向，身體和背鰭跟著彎曲，龍息的龍頭也一樣',
     '👼 修正天使之刃：翅膀改成從 Boss 後面展開，不會擋住 Boss',
@@ -2611,11 +2673,196 @@ function endStroke(e) {
 cv.addEventListener('pointerup', endStroke);
 cv.addEventListener('pointercancel', endStroke);
 
+// ===== 刀具插圖：每把刀用程式畫成不同造型的武器（刀身形狀、花紋、護手、刀柄） =====
+// shape：刀身形狀；pal：[亮, 中, 暗]；pattern：刀身花紋；guard：護手造型；w：刀身寬度（相對圖片大小）
+const BLADE_ART = {
+  basic:   { shape: 'chef',   w: 0.075, pal: ['#f5f7fa', '#c3ccd6', '#7d8894'], glow: null,      pattern: null,       guard: 'bolster', handle: '#5a3420', gem: null },
+  fire:    { shape: 'broad',  w: 0.07,  pal: ['#fff3b0', '#ff8c1a', '#a52a00'], glow: '#ff6a00', pattern: 'flames',   guard: 'cross',   handle: '#3b1d10', gem: '#ff3b30' },
+  ice:     { shape: 'straight', w: 0.06, pal: ['#ffffff', '#b8ecff', '#3fa7d6'], glow: '#a8e6ff', pattern: 'ice',     guard: 'cross',   handle: '#2b4a6b', gem: '#7fdbff' },
+  poison:  { shape: 'wavy',   w: 0.06,  pal: ['#e9ff70', '#52b788', '#1b4332'], glow: '#80ed99', pattern: 'drips',    guard: 'tsuba',   handle: '#1d1d1d', gem: '#9ef01a' },
+  sakura:  { shape: 'katana', w: 0.045, pal: ['#ffffff', '#ffd6e5', '#ff8fab'], glow: '#ffafcc', pattern: 'sakura',   guard: 'tsuba',   handle: '#7a1f4a', gem: null },
+  thunder: { shape: 'great',  w: 0.08,  pal: ['#ffffff', '#fff3a0', '#b89300'], glow: '#ffd60a', pattern: 'lightning', guard: 'cross',  handle: '#2b2d42', gem: '#ffd60a' },
+  water:   { shape: 'curved', w: 0.055, pal: ['#ffffff', '#90e0ef', '#0077b6'], glow: '#48cae4', pattern: 'waves',    guard: 'cross',   handle: '#023e8a', gem: '#00b4d8' },
+  wind:    { shape: 'rapier', w: 0.05,  pal: ['#ffffff', '#c7f9cc', '#38a169'], glow: '#80ed99', pattern: 'swirl',    guard: 'cross',   handle: '#1b4332', gem: '#b7e4c7' },
+  shadow:  { shape: 'katana', w: 0.05,  pal: ['#9d4edd', '#2b0a3d', '#07000c'], glow: '#c77dff', pattern: 'runes',    guard: 'tsuba',   handle: '#1a1a1a', gem: '#ff006e' },
+  gold:    { shape: 'straight', w: 0.07, pal: ['#fff8d6', '#ffd166', '#a8740a'], glow: '#ffd166', pattern: 'engrave', guard: 'cross',   handle: '#7a4a00', gem: '#e63946' },
+  love:    { shape: 'straight', w: 0.062, pal: ['#ffffff', '#ffc2d6', '#ff5c8a'], glow: '#ff8fab', pattern: 'hearts', guard: 'heart',   handle: '#7a1f4a', gem: '#ff5c8a' },
+  holy:    { shape: 'great',  w: 0.07,  pal: ['#ffffff', '#fffbe6', '#d4a72c'], glow: '#fff3b0', pattern: 'holy',     guard: 'cross',   handle: '#f4e3b2', gem: '#4cc9f0' },
+  galaxy:  { shape: 'straight', w: 0.065, pal: ['#a0c4ff', '#3a0ca3', '#10002b'], glow: '#7b2cbf', pattern: 'stars', guard: 'cross',   handle: '#240046', gem: '#f72585' },
+  time:    { shape: 'leaf',   w: 0.06,  pal: ['#ffffff', '#cdb4db', '#5c636a'], glow: '#e0e0e0', pattern: 'clock',    guard: 'gear',    handle: '#3a3a3a', gem: '#ffd166' },
+  candy:   { shape: 'straight', w: 0.062, pal: ['#ffffff', '#ffe5ec', '#ffafcc'], glow: '#ff8fab', pattern: 'stripes', guard: 'tsuba',  handle: '#70d6ff', gem: '#ffd670' },
+  dragon:  { shape: 'broad',  w: 0.075, pal: ['#fff3b0', '#ffb703', '#9d0208'], glow: '#ff6a00', pattern: 'scales',   guard: 'dragon',  handle: '#6a040f', gem: '#d00000' },
+  angel:   { shape: 'straight', w: 0.06, pal: ['#ffffff', '#fff8e7', '#f2c4d8'], glow: '#ffffff', pattern: 'feathers', guard: 'wings',  handle: '#f4e3b2', gem: '#4cc9f0' },
+};
+const bladeIconCache = {};
+function bladeIcon(b, px = 160) {
+  const key = b.id + px;
+  if (!bladeIconCache[key]) { const c = document.createElement('canvas'); c.width = c.height = px; drawBladeArt(c.getContext('2d'), b.id, px); bladeIconCache[key] = c.toDataURL(); }
+  return bladeIconCache[key];
+}
+function drawBladeArt(g, id, px) {
+  const A = BLADE_ART[id] || BLADE_ART.basic, R = rng([...id].reduce((a, ch) => a + ch.charCodeAt(0), 7) * 97);
+  const L = px * 1.08, bl = L * 0.6, hl = L * 0.25, w = px * A.w;
+  g.save(); g.translate(px / 2, px / 2); g.rotate(-Math.PI / 4); g.translate(-(bl - hl) / 2, 0);
+  // 刀身輪廓：沿著刀身取樣上下兩條邊
+  const N = 30, top = [], bot = [], mid = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, x = u * bl * 0.9; let ww = w, c = 0;
+    switch (A.shape) {
+      case 'katana': ww = w * (1 - u * 0.15); c = -u * u * w * 1.6; break;
+      case 'curved': ww = w * (0.7 + u * 0.75); c = -u * u * w * 2.4; break;
+      case 'broad': ww = w * (0.85 + u * 0.6); break;
+      case 'wavy': ww = w * (1 - u * 0.45); c = Math.sin(u * Math.PI * 5) * w * 0.4; break;
+      case 'rapier': ww = w * (1 - u * 0.5); break;
+      case 'leaf': ww = u < 0.62 ? w * 0.38 : w * (0.38 + 1.5 * Math.max(0, 1 - Math.abs(u - 0.8) / 0.18)); break; // 時鐘指針：細桿 + 菱形尖端
+      default: ww = w * (1 - u * 0.12);
+    }
+    top.push([x, c - ww]); bot.push([x, c + ww]); mid.push([x, c]);
+  }
+  const lastC = mid[N][1], lastW = bot[N][1] - lastC;
+  const tip = A.shape === 'broad' ? [bl, lastC - lastW * 0.85] : A.shape === 'chef' ? [bl, lastC - w * 0.75] : [bl, lastC];
+  const blade = () => { g.beginPath(); g.moveTo(...top[0]); for (const p of top) g.lineTo(...p); g.lineTo(...tip); for (let i = N; i >= 0; i--) g.lineTo(...bot[i]); g.closePath(); };
+  // 光暈
+  if (A.glow) { g.save(); g.shadowColor = A.glow; g.shadowBlur = px * 0.09; blade(); g.fillStyle = A.glow; g.fill(); g.restore(); }
+  // 刀身金屬漸層
+  blade();
+  let gr = g.createLinearGradient(0, -w * 1.8, 0, w * 1.8);
+  gr.addColorStop(0, A.pal[0]); gr.addColorStop(0.45, A.pal[1]); gr.addColorStop(1, A.pal[2]);
+  g.fillStyle = gr; g.fill();
+  // 花紋（只畫在刀身裡面）
+  g.save(); blade(); g.clip();
+  const along = (k) => mid[Math.min(N, Math.round(k * N))];
+  switch (A.pattern) {
+    case 'flames':
+      for (let i = 0; i < 7; i++) { const x = bl * (0.05 + i * 0.12), [mx, my] = along(x / bl); g.fillStyle = i % 2 ? 'rgba(255,220,80,0.75)' : 'rgba(255,90,0,0.7)'; g.beginPath(); g.moveTo(x - w * 0.6, my + w * 1.5); g.quadraticCurveTo(x - w * 0.2, my, x + w * 0.9, my - w * 1.4); g.quadraticCurveTo(x + w * 0.3, my + w * 0.2, x + w * 0.6, my + w * 1.5); g.fill(); }
+      break;
+    case 'ice':
+      g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = px * 0.006;
+      for (let i = 0; i < 9; i++) { const x = R() * bl * 0.9, [, my] = along(x / bl); g.beginPath(); g.moveTo(x, my - w); g.lineTo(x + w * (R() - 0.5) * 2, my + w); g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = 0; i < 12; i++) { const x = R() * bl, [, my] = along(x / bl); g.beginPath(); g.arc(x, my + (R() - 0.5) * w * 1.6, px * 0.006, 0, 7); g.fill(); }
+      break;
+    case 'sakura':
+      for (let i = 0; i < 9; i++) { const x = bl * (0.08 + R() * 0.85), [, my] = along(x / bl); g.save(); g.translate(x, my + (R() - 0.5) * w); g.rotate(R() * 6); g.fillStyle = i % 2 ? '#ff8fab' : '#ffc8dd'; g.beginPath(); g.ellipse(0, 0, w * 0.5, w * 0.28, 0, 0, 7); g.fill(); g.restore(); }
+      g.strokeStyle = 'rgba(122,31,74,0.5)'; g.lineWidth = px * 0.008; g.beginPath(); mid.forEach(([x, y], i) => i ? g.lineTo(x, y + w * 0.45) : g.moveTo(x, y + w * 0.45)); g.stroke();
+      break;
+    case 'lightning':
+      g.save(); g.shadowColor = '#fff3a0'; g.shadowBlur = px * 0.04; g.strokeStyle = '#ffffff'; g.lineWidth = px * 0.012; g.beginPath();
+      for (let i = 0; i <= 10; i++) { const x = bl * i / 10 * 0.95; g[i ? 'lineTo' : 'moveTo'](x, (i % 2 ? -1 : 1) * w * 0.45); } g.stroke(); g.restore();
+      break;
+    case 'waves':
+      g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = px * 0.008;
+      for (const off of [-0.5, 0, 0.5]) { g.beginPath(); mid.forEach(([x, y], i) => { const yy = y + off * w * 1.2 + Math.sin(x / bl * 18) * w * 0.18; i ? g.lineTo(x, yy) : g.moveTo(x, yy); }); g.stroke(); }
+      break;
+    case 'swirl':
+      g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = px * 0.007;
+      for (let i = 0; i < 5; i++) { const x = bl * (0.12 + i * 0.17); g.beginPath(); g.arc(x, 0, w * 0.8, 0.3, Math.PI * 1.5); g.stroke(); }
+      break;
+    case 'runes':
+      g.save(); g.shadowColor = '#ff006e'; g.shadowBlur = px * 0.03; g.fillStyle = '#ff4d8d'; g.font = `900 ${w * 1.25}px serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      // 從刀尖往護手方向依序是「妖刀村正」，字保持正立
+      [...'妖刀村正'].forEach((ch, i) => { const x = bl * (0.75 - i * 0.17), [, my] = along(x / bl); g.save(); g.translate(x, my); g.rotate(Math.PI / 4); g.fillText(ch, 0, 0); g.restore(); });
+      g.restore();
+      break;
+    case 'engrave':
+      g.strokeStyle = 'rgba(122,74,0,0.55)'; g.lineWidth = px * 0.007;
+      for (let i = 0; i < 4; i++) { const x = bl * (0.12 + i * 0.18); g.beginPath(); g.arc(x, -w * 0.2, w * 0.45, Math.PI * 0.2, Math.PI * 1.6); g.stroke(); g.beginPath(); g.arc(x + w * 0.6, w * 0.25, w * 0.35, Math.PI * 1.2, Math.PI * 2.6); g.stroke(); }
+      for (const k of [0.25, 0.6]) { g.fillStyle = radial(g, bl * k - w * 0.1, -w * 0.1, 0, w * 0.4, [[0, '#ffffff'], [0.4, '#ff6b6b'], [1, '#9d0208']]); g.beginPath(); g.arc(bl * k, 0, w * 0.35, 0, 7); g.fill(); }
+      break;
+    case 'hearts':
+      for (let i = 0; i < 6; i++) { const x = bl * (0.1 + i * 0.15), s = w * 0.55; g.fillStyle = i % 2 ? '#ff5c8a' : '#ffffff'; g.beginPath(); g.moveTo(x, s * 0.35); g.bezierCurveTo(x - s * 1.1, -s * 0.35, x - s * 0.55, -s * 1.05, x, -s * 0.5); g.bezierCurveTo(x + s * 0.55, -s * 1.05, x + s * 1.1, -s * 0.35, x, s * 0.35); g.fill(); }
+      break;
+    case 'holy':
+      g.save(); g.shadowColor = '#ffffff'; g.shadowBlur = px * 0.05; g.strokeStyle = '#ffffff'; g.lineWidth = w * 0.35; g.beginPath(); g.moveTo(bl * 0.05, 0); g.lineTo(bl * 0.95, 0); g.stroke(); g.restore();
+      g.strokeStyle = '#d4a72c'; g.lineWidth = px * 0.012; g.beginPath(); g.moveTo(bl * 0.15, -w * 0.7); g.lineTo(bl * 0.15, w * 0.7); g.moveTo(bl * 0.08, 0); g.lineTo(bl * 0.22, 0); g.stroke();
+      break;
+    case 'stars':
+      g.fillStyle = radial(g, bl * 0.55, 0, 0, bl * 0.4, [[0, 'rgba(247,37,133,0.45)'], [1, 'rgba(247,37,133,0)']]); g.fillRect(0, -w * 2, bl, w * 4);
+      g.fillStyle = '#ffffff'; for (let i = 0; i < 22; i++) { g.globalAlpha = 0.5 + R() * 0.5; g.beginPath(); g.arc(R() * bl, (R() - 0.5) * w * 1.8, px * (0.003 + R() * 0.006), 0, 7); g.fill(); } g.globalAlpha = 1;
+      break;
+    case 'clock':
+      g.strokeStyle = 'rgba(40,40,40,0.6)'; g.lineWidth = px * 0.006;
+      for (let i = 1; i < 12; i++) { const x = bl * i / 12; g.beginPath(); g.moveTo(x, -w * (i % 3 ? 0.3 : 0.7)); g.lineTo(x, w * (i % 3 ? 0.3 : 0.7)); g.stroke(); }
+      break;
+    case 'stripes':
+      g.fillStyle = '#ff5c8a'; for (let x = -w * 3; x < bl + w * 3; x += w * 1.6) { g.beginPath(); g.moveTo(x, -w * 2); g.lineTo(x + w * 0.7, -w * 2); g.lineTo(x - w * 0.9, w * 2); g.lineTo(x - w * 1.6, w * 2); g.closePath(); g.fill(); }
+      break;
+    case 'scales':
+      g.strokeStyle = 'rgba(157,2,8,0.55)'; g.lineWidth = px * 0.006;
+      for (let row = -2; row <= 2; row++) for (let x = (row % 2) * w * 0.4; x < bl; x += w * 0.8) { g.beginPath(); g.arc(x, row * w * 0.5, w * 0.4, 0, Math.PI); g.stroke(); }
+      break;
+    case 'feathers':
+      g.strokeStyle = 'rgba(212,167,44,0.55)'; g.lineWidth = px * 0.006;
+      for (let i = 0; i < 7; i++) { const x = bl * (0.08 + i * 0.13); g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + w * 0.8, -w * 0.9, x + w * 1.4, -w * 0.4); g.moveTo(x, 0); g.quadraticCurveTo(x + w * 0.8, w * 0.9, x + w * 1.4, w * 0.4); g.stroke(); }
+      break;
+  }
+  g.restore();
+  // 刀鋒高光、血槽
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = px * 0.01; g.beginPath(); bot.forEach(([x, y], i) => i ? g.lineTo(x, y - px * 0.006) : g.moveTo(x, y - px * 0.006)); g.lineTo(tip[0], tip[1]); g.stroke();
+  if (!['rapier', 'leaf', 'wavy'].includes(A.shape)) { g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = w * 0.22; g.beginPath(); mid.slice(2, Math.round(N * 0.75)).forEach(([x, y], i) => i ? g.lineTo(x, y - w * 0.15) : g.moveTo(x, y - w * 0.15)); g.stroke(); }
+  if (A.pattern === 'drips') { g.fillStyle = '#9ef01a'; for (const k of [0.25, 0.5, 0.72]) { const [x, y] = bot[Math.round(k * N)]; g.beginPath(); g.moveTo(x - w * 0.2, y); g.quadraticCurveTo(x, y + w * 1.3, x + w * 0.2, y); g.fill(); g.beginPath(); g.arc(x, y + w * 1.1, w * 0.22, 0, 7); g.fill(); } }
+  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = px * 0.006; blade(); g.stroke();
+  // 刀柄：纏繩花紋 + 柄頭寶石
+  const hw = Math.max(w * 0.75, px * 0.03);
+  gr = g.createLinearGradient(0, -hw, 0, hw); gr.addColorStop(0, A.handle); gr.addColorStop(0.5, '#ffffff22'); gr.addColorStop(1, A.handle);
+  g.fillStyle = A.handle; g.beginPath(); g.roundRect(-hl, -hw, hl, hw * 2, hw * 0.5); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = px * 0.006;
+  for (let x = -hl + hw; x < -hw * 0.5; x += hw * 1.1) { g.beginPath(); g.moveTo(x, -hw); g.lineTo(x + hw * 0.55, hw); g.moveTo(x + hw * 0.55, -hw); g.lineTo(x, hw); g.stroke(); }
+  g.fillStyle = A.gem ? radial(g, -hl - hw * 0.25, -hw * 0.3, 0, hw * 1.2, [[0, '#ffffff'], [0.4, A.gem], [1, '#000000']]) : '#9aa3ad';
+  g.beginPath(); g.arc(-hl, 0, hw * 1.05, 0, 7); g.fill();
+  // 護手
+  const gold = (x0, y0, x1, y1) => { const q = g.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, '#fff3b0'); q.addColorStop(0.5, '#d4a72c'); q.addColorStop(1, '#7a5200'); return q; };
+  switch (A.guard) {
+    case 'bolster': g.fillStyle = '#b8c2cc'; g.beginPath(); g.roundRect(-w * 0.35, -w * 1.15, w * 0.45, w * 2.3, w * 0.15); g.fill(); break;
+    case 'cross':
+      g.fillStyle = gold(0, -w * 2.8, 0, w * 2.8); g.beginPath(); g.roundRect(-w * 0.45, -w * 2.8, w * 0.5, w * 5.6, w * 0.2); g.fill();
+      for (const s of [-1, 1]) { g.beginPath(); g.arc(-w * 0.2, s * w * 2.8, w * 0.38, 0, 7); g.fill(); }
+      if (A.gem) { g.fillStyle = radial(g, -w * 0.3, -w * 0.15, 0, w * 0.5, [[0, '#ffffff'], [0.4, A.gem], [1, '#000']]); g.beginPath(); g.arc(-w * 0.2, 0, w * 0.4, 0, 7); g.fill(); }
+      break;
+    case 'tsuba':
+      g.fillStyle = '#1a1a1a'; g.beginPath(); g.ellipse(-w * 0.2, 0, w * 0.4, w * 1.9, 0, 0, 7); g.fill();
+      g.strokeStyle = gold(0, -w * 2, 0, w * 2); g.lineWidth = px * 0.012; g.stroke();
+      break;
+    case 'heart': {
+      const s = w * 2.2; g.fillStyle = gold(0, -s, 0, s); g.save(); g.translate(-w * 0.2, 0); g.rotate(Math.PI / 2);
+      g.beginPath(); g.moveTo(0, s * 0.35); g.bezierCurveTo(-s * 1.1, -s * 0.35, -s * 0.55, -s * 1.05, 0, -s * 0.5); g.bezierCurveTo(s * 0.55, -s * 1.05, s * 1.1, -s * 0.35, 0, s * 0.35); g.fill();
+      g.fillStyle = '#ff5c8a'; g.scale(0.55, 0.55); g.beginPath(); g.moveTo(0, s * 0.35); g.bezierCurveTo(-s * 1.1, -s * 0.35, -s * 0.55, -s * 1.05, 0, -s * 0.5); g.bezierCurveTo(s * 0.55, -s * 1.05, s * 1.1, -s * 0.35, 0, s * 0.35); g.fill();
+      g.restore(); break;
+    }
+    case 'gear':
+      g.fillStyle = '#8d99ae'; g.beginPath();
+      for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, rr = w * (i % 2 ? 1.5 : 1.9); g.lineTo(-w * 0.2 + Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fill();
+      g.fillStyle = radial(g, -w * 0.3, -w * 0.2, 0, w * 0.8, [[0, '#ffffff'], [0.4, A.gem], [1, '#7a5200']]); g.beginPath(); g.arc(-w * 0.2, 0, w * 0.7, 0, 7); g.fill();
+      break;
+    case 'wings':
+      for (const s of [-1, 1]) for (let i = 0; i < 4; i++) {
+        g.save(); g.translate(-w * 0.3, s * w * 0.5); g.rotate(s * (Math.PI / 2 + 0.5 - i * 0.28));
+        g.fillStyle = i % 2 ? '#ffffff' : '#ffe8a3'; g.beginPath(); g.ellipse(w * 1.3, 0, w * (1.5 - i * 0.2), w * 0.32, 0, 0, 7); g.fill(); g.restore();
+      }
+      g.fillStyle = radial(g, -w * 0.35, -w * 0.15, 0, w * 0.5, [[0, '#ffffff'], [0.4, A.gem], [1, '#000']]); g.beginPath(); g.arc(-w * 0.25, 0, w * 0.42, 0, 7); g.fill();
+      break;
+    case 'dragon':
+      // 龍頭護手：金色龍頭咬住刀身，紅色鬃毛
+      g.fillStyle = '#d00000'; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(-w * 0.6, -w * 1.2 + i * w * 0.6); g.lineTo(-w * 2.2, -w * 1.6 + i * w * 0.75); g.lineTo(-w * 0.6, -w * 0.9 + i * w * 0.6); g.fill(); }
+      g.fillStyle = gold(0, -w * 1.6, 0, w * 1.6); g.beginPath(); g.ellipse(-w * 0.3, 0, w * 1.1, w * 1.5, 0, 0, 7); g.fill();
+      g.beginPath(); g.moveTo(w * 0.4, -w * 0.9); g.quadraticCurveTo(w * 1.4, -w * 0.4, w * 1.6, 0); g.quadraticCurveTo(w * 1.4, w * 0.4, w * 0.4, w * 0.9); g.fill();
+      g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(w * 0.1, -w * 0.55, w * 0.25, w * 0.18, 0, 0, 7); g.fill();
+      g.fillStyle = '#d00000'; g.beginPath(); g.arc(w * 0.15, -w * 0.55, w * 0.11, 0, 7); g.fill();
+      break;
+  }
+  g.restore();
+}
+
 // ===== 介面 =====
 const $ = id => document.getElementById(id);
 const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear', 'cloud', 'nameset', 'checkin', 'whatsnew'];
 let shopReturn = 'menu', curStage = 0;
-function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', !(state === 'play' || state === 'paused')); }
+function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', !(state === 'play' || state === 'paused')); requestAnimationFrame(updateScrollHint); }
+// 畫面內容超出螢幕、而且還沒滑到底時，在底部顯示提示，避免玩家找不到下面的按鈕
+function updateScrollHint() {
+  const el = screens.map(s => $(s)).find(e => !e.classList.contains('hidden'));
+  $('scroll-hint').classList.toggle('hidden', !(el && el.scrollHeight - el.clientHeight - el.scrollTop > 16));
+}
+setInterval(updateScrollHint, 500);
 
 function updateHUD() {
   if (!G) return;
@@ -2649,7 +2896,7 @@ function canCheckin() { return !save.checkin || save.checkin.last !== todayStr()
 function openCheckin() { state = 'checkin'; G = null; $('checkin-msg').textContent = ''; renderCheckin(); show('checkin'); }
 function renderCheckin() {
   const done = save.checkin ? save.checkin.days : 0, todayDone = !canCheckin();
-  $('checkin-title').textContent = done >= CHECKIN_DAYS ? '已完成 30 天簽到 🎉 之後每天簽到 +300 💰' : `已累積簽到 ${done} / ${CHECKIN_DAYS} 天`;
+  $('checkin-title').textContent = done >= CHECKIN_DAYS ? '已完成 30 天簽到 🎉 之後每天簽到 +300 💰' : `已累積 ${done} / ${CHECKIN_DAYS} 天・第 30 天送 👼 天使之刃（漏簽不會重來）`;
   const grid = $('checkin-grid'); grid.innerHTML = '';
   for (let d = 1; d <= CHECKIN_DAYS; d++) {
     const rw = checkinReward(d), cell = document.createElement('div');
@@ -2682,8 +2929,8 @@ function renderStages() {
     const locked = i >= save.unlocked;
     const bt = document.createElement('button');
     bt.className = 'stage'; bt.disabled = locked; bt.style.background = st.card;
-    const info = locked ? '🔒 打倒上一關的 5 隻 Boss 後解鎖' : `${save.cleared[i] ? '✅ 已通關・' : ''}最高分 ${save.stageBest[i] || 0}`;
-    bt.innerHTML = `<div class="s-icon">${locked ? '🔒' : st.icon}</div><div class="s-name">第 ${i + 1} 關　${st.name}</div><div class="s-go">${locked ? '' : '▶'}</div><div class="s-info">${info}</div>`;
+    const info = locked ? `🔒 通過第 ${i} 關解鎖` : `${save.cleared[i] ? '✅ ' : ''}最高 ${save.stageBest[i] || 0}`;
+    bt.innerHTML = `<div class="s-icon">${locked ? '🔒' : st.icon}</div><div class="s-name">第 ${i + 1} 關<br>${st.name}</div><div class="s-go">${locked ? '' : '▶'}</div><div class="s-info">${info}</div>`;
     bt.onclick = () => startGame(i);
     list.appendChild(bt);
   });
@@ -2726,57 +2973,67 @@ function stageClear() {
 function openShop(from) { shopReturn = from; state = 'shop'; renderShop(); show('shop'); }
 
 let shopTab = 'blades';
+const shopSel = { blades: null, perks: 'coin' };
 function renderShop() {
   $('shop-coins').textContent = save.coins;
   for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.tab === shopTab);
-  const list = $('shop-list'); list.innerHTML = '';
-  if (shopTab === 'perks') return renderPerks(list);
+  const list = $('shop-list'), det = $('shop-detail'); list.innerHTML = ''; det.innerHTML = '';
+  if (shopTab === 'perks') return renderPerks(list, det);
+  if (!shopSel.blades) shopSel.blades = save.equipped;
   for (const b of BLADES) {
-    const owned = !!save.owned[b.id], lvl = save.levels[b.id] || 1, eq = save.equipped === b.id;
-    const card = document.createElement('div');
-    card.className = 'card' + (eq ? ' equipped' : '');
-    const sw = b.rainbow ? 'linear-gradient(90deg,#ff5c8a,#ffd166,#8ac926,#3fa7d6,#9d4edd)' : `linear-gradient(90deg,${b.colors.join(',')})`;
-    card.innerHTML = `<div class="icon">${b.icon}</div>
-      <div class="name">${b.name}<span class="lv">${owned ? '★'.repeat(lvl) + '☆'.repeat(MAX_LEVEL - lvl) : ''}</span></div>
-      <div class="desc">${b.desc}<br>💥 擊殺技：<b>${b.finisher}</b></div>
-      <div class="fx">${owned ? effectText(b, lvl) + (lvl < MAX_LEVEL ? `<br>升級後：${effectText(b, lvl + 1)}` : '') : effectText(b, 1)}</div>
-      <div class="swatch" style="background:${sw}"></div>
-      <div class="actions"></div>`;
-    const act = card.querySelector('.actions');
-    const mk = (label, cls, disabled, fn) => { const bt = document.createElement('button'); bt.className = 'btn ' + cls; bt.textContent = label; bt.disabled = disabled; bt.onclick = () => { audio(); fn(); }; act.appendChild(bt); };
-    if (!owned && !bladeUnlocked(b)) {
-      mk(`🔒 ${reqText(b)}`, 'ghost', true, () => {});
-    } else if (!owned) {
-      mk(`購買 💰${b.price}`, '', save.coins < b.price, () => { save.coins -= b.price; save.owned[b.id] = true; save.levels[b.id] = 1; save.equipped = b.id; persist(); sfx.win(); renderShop(); });
-    } else {
-      mk(eq ? '使用中' : '裝備', eq ? 'ghost' : 'alt', eq, () => { save.equipped = b.id; persist(); sfx.coin(); renderShop(); });
-      if (lvl < MAX_LEVEL) { const c = upgradeCost(b, lvl); mk(`升級 💰${c}`, '', save.coins < c, () => { save.coins -= c; save.levels[b.id] = lvl + 1; persist(); sfx.win(); renderShop(); }); }
-      else mk('已滿級 ✨', 'ghost', true, () => {});
-    }
-    list.appendChild(card);
+    const owned = !!save.owned[b.id], lvl = save.levels[b.id] || 1, locked = !owned && !bladeUnlocked(b), eq = save.equipped === b.id;
+    const tile = document.createElement('button');
+    tile.className = 'tile' + (shopSel.blades === b.id ? ' sel' : '') + (eq ? ' eq' : '') + (locked ? ' locked' : '');
+    tile.innerHTML = `<img src="${bladeIcon(b)}" alt=""><div class="tn">${b.name}</div><div class="ts">${owned ? 'Lv.' + lvl : locked ? '🔒' : '💰' + b.price}</div>${eq ? '<div class="tb">使用中</div>' : ''}`;
+    tile.onclick = () => { audio(); shopSel.blades = b.id; renderShop(); };
+    list.appendChild(tile);
   }
+  const b = BLADES.find(x => x.id === shopSel.blades) || BLADES[0];
+  const owned = !!save.owned[b.id], lvl = save.levels[b.id] || 1, eq = save.equipped === b.id;
+  const card = document.createElement('div');
+  card.className = 'card' + (eq ? ' equipped' : '');
+  card.innerHTML = `<div class="icon"><img src="${bladeIcon(b)}" alt=""></div>
+    <div class="name">${b.name}<span class="lv">${owned ? '★'.repeat(lvl) + '☆'.repeat(MAX_LEVEL - lvl) : ''}</span></div>
+    <div class="desc">${b.desc}<br>💥 擊殺技：<b>${b.finisher}</b></div>
+    <div class="fx">${owned ? effectText(b, lvl) + (lvl < MAX_LEVEL ? `<br>升級後：${effectText(b, lvl + 1)}` : '') : effectText(b, 1)}</div>
+    <div class="actions"></div>`;
+  const act = card.querySelector('.actions');
+  const mk = (label, cls, disabled, fn) => { const bt = document.createElement('button'); bt.className = 'btn ' + cls; bt.textContent = label; bt.disabled = disabled; bt.onclick = () => { audio(); fn(); }; act.appendChild(bt); };
+  if (!owned && !bladeUnlocked(b)) mk(`🔒 ${reqText(b)}`, 'ghost', true, () => {});
+  else if (!owned) mk(`購買 💰${b.price}`, '', save.coins < b.price, () => { save.coins -= b.price; save.owned[b.id] = true; save.levels[b.id] = 1; save.equipped = b.id; persist(); sfx.win(); renderShop(); });
+  else {
+    mk(eq ? '使用中' : '裝備', eq ? 'ghost' : 'alt', eq, () => { save.equipped = b.id; persist(); sfx.coin(); renderShop(); });
+    if (lvl < MAX_LEVEL) { const c = upgradeCost(b, lvl); mk(`升級 💰${c}`, '', save.coins < c, () => { save.coins -= c; save.levels[b.id] = lvl + 1; persist(); sfx.win(); renderShop(); }); }
+    else mk('已滿級 ✨', 'ghost', true, () => {});
+  }
+  det.appendChild(card);
 }
 
-function renderPerks(list) {
+function renderPerks(list, det) {
   save.perks = save.perks || {};
   for (const p of PERKS) {
-    const lvl = perkLvl(p.id), maxed = lvl >= p.max;
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `<div class="icon">${p.icon}</div>
-      <div class="name">${p.name}<span class="lv">${'★'.repeat(lvl)}${'☆'.repeat(p.max - lvl)}</span></div>
-      <div class="desc">目前：${lvl ? p.desc(lvl) : '尚未強化'}</div>
-      <div class="fx">${maxed ? '已經強化到最高等級 ✨' : `升級後：${p.desc(lvl + 1)}`}</div>
-      <div class="actions"></div>`;
-    const bt = document.createElement('button');
-    const cost = perkCost(p, lvl);
-    bt.className = 'btn' + (maxed ? ' ghost' : '');
-    bt.textContent = maxed ? '已滿級 ✨' : `強化 💰${cost}`;
-    bt.disabled = maxed || save.coins < cost;
-    bt.onclick = () => { audio(); save.coins -= cost; save.perks[p.id] = lvl + 1; persist(); sfx.win(); renderShop(); };
-    card.querySelector('.actions').appendChild(bt);
-    list.appendChild(card);
+    const lvl = perkLvl(p.id), tile = document.createElement('button');
+    tile.className = 'tile' + (shopSel.perks === p.id ? ' sel' : '');
+    tile.innerHTML = `<div class="ti">${p.icon}</div><div class="tn">${p.name}</div><div class="ts">${'★'.repeat(lvl)}${'☆'.repeat(p.max - lvl)}</div>`;
+    tile.onclick = () => { audio(); shopSel.perks = p.id; renderShop(); };
+    list.appendChild(tile);
   }
+  const p = PERKS.find(x => x.id === shopSel.perks) || PERKS[0];
+  const lvl = perkLvl(p.id), maxed = lvl >= p.max, cost = perkCost(p, lvl);
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<div class="icon">${p.icon}</div>
+    <div class="name">${p.name}<span class="lv">${'★'.repeat(lvl)}${'☆'.repeat(p.max - lvl)}</span></div>
+    <div class="desc">目前：${lvl ? p.desc(lvl) : '尚未強化'}</div>
+    <div class="fx">${maxed ? '已經強化到最高等級 ✨' : `升級後：${p.desc(lvl + 1)}`}</div>
+    <div class="actions"></div>`;
+  const bt = document.createElement('button');
+  bt.className = 'btn' + (maxed ? ' ghost' : '');
+  bt.textContent = maxed ? '已滿級 ✨' : `強化 💰${cost}`;
+  bt.disabled = maxed || save.coins < cost;
+  bt.onclick = () => { audio(); save.coins -= cost; save.perks[p.id] = lvl + 1; persist(); sfx.win(); renderShop(); };
+  card.querySelector('.actions').appendChild(bt);
+  det.appendChild(card);
 }
 for (const t of document.querySelectorAll('.tab')) t.onclick = () => { audio(); shopTab = t.dataset.tab; renderShop(); };
 $('version').textContent = 'v' + VERSION;
@@ -2806,6 +3063,7 @@ function openNameSet() { state = 'nameset'; G = null; $('boss-bar').classList.ad
 function openCloud(from) {
   cloudReturn = from; state = 'cloud'; restoreArmed = false;
   $('restore-box').classList.toggle('hidden', from !== 'nameset');
+  $('cloud-main').classList.toggle('hidden', from === 'nameset'); // 輸入恢復碼時先把恢復碼框藏起來，畫面才放得下
   $('restore-msg').textContent = ''; $('btn-restore').textContent = '恢復進度';
   renderCloud(); show('cloud');
 }
@@ -2838,7 +3096,7 @@ $('btn-copy-code').onclick = async () => {
   catch (e) { $('btn-copy-code').textContent = '請長按恢復碼複製'; }
   setTimeout(() => { $('btn-copy-code').textContent = '📋 複製恢復碼'; }, 1800);
 };
-$('btn-restore-open').onclick = () => { $('restore-box').classList.toggle('hidden'); };
+$('btn-restore-open').onclick = () => { const open = $('restore-box').classList.toggle('hidden'); $('cloud-main').classList.toggle('hidden', !open); };
 $('btn-restore').onclick = async () => {
   const input = $('restore-input').value;
   // 已經有進度的話，要按第二次才會覆蓋
