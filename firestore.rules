@@ -1,0 +1,27 @@
+rules_version = '2';
+// 貼到 Firebase 主控台 → Firestore Database → 規則
+// ADMIN_UID 換成管理員的 UID（用管理員帳號登入 admin.html 時，畫面上會顯示）
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == 'ADMIN_UID';
+    }
+
+    // 每個玩家一份存檔，文件 ID 就是恢復碼
+    match /saves/{code} {
+      // 知道恢復碼才能讀那一份；無法列出全部（列表只給管理員）
+      allow get: if true;
+      allow list: if isAdmin();
+
+      // 寫入時檢查恢復碼格式與欄位，避免亂寫
+      allow create, update: if code.matches('FRUIT-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}')
+        && request.resource.data.keys().hasOnly(['name', 'save', 'version', 'updatedAt', 'stats'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.save is map
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isAdmin();
+    }
+  }
+}

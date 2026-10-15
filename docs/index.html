@@ -100,6 +100,17 @@
   #stage-hud { font-size: 13px; color: var(--muted); margin-top: 2px; }
   #clear .big-score { font-size: 56px; }
   .btn-row { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  #cloud, #nameset { overflow-y: auto; touch-action: pan-y; }
+  #cloud h2, #nameset h2 { margin: 0; font-size: 26px; }
+  .cloud-box { background: var(--panel); border: 2px solid rgba(255,158,192,.25); border-radius: 18px; padding: 12px 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 460px; width: 100%; }
+  .cloud-box .stat { margin: 0; }
+  .code { font: 900 30px/1.2 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: 2px; color: var(--gold);
+    user-select: all; -webkit-user-select: all; text-shadow: 0 2px 0 #a0522d; }
+  .field { pointer-events: auto; font: inherit; font-size: 20px; padding: 12px 18px; border-radius: 14px; width: min(320px, 100%);
+    border: 2px solid rgba(255,158,192,.4); background: rgba(0,0,0,.35); color: #fff; text-align: center;
+    user-select: text; -webkit-user-select: text; touch-action: auto; }
+  .field:focus { outline: none; border-color: var(--gold); }
   #shop-list, #stage-list { margin: 0 auto; }
 
   /* 橫屏：按鈕排成一排、商店每個項目是一整行（圖示｜說明｜按鈕） */
@@ -147,9 +158,40 @@
   <div class="btn-row">
   <button class="btn" id="btn-play">開始遊戲</button>
   <button class="btn alt" id="btn-shop">🛒 商店</button>
+  <button class="btn ghost" id="btn-cloud">☁️ 雲端存檔</button>
   </div>
   <p class="stat hint" style="max-width:300px">滑動手指切水果！不要切到 💣<br>每關打倒 5 隻 Boss 就能解鎖下一關</p>
   <div id="version"></div>
+</div>
+
+<div id="nameset" class="screen hidden">
+  <h2>歡迎！先取個暱稱吧 🍉</h2>
+  <p class="stat">暱稱會和你的恢復碼一起存到雲端，<br>忘記恢復碼時，可以報暱稱請管理員幫你查。</p>
+  <input class="field" id="name-input" maxlength="12" placeholder="你的暱稱" autocomplete="off">
+  <div class="btn-row">
+    <button class="btn" id="btn-name-ok">開始</button>
+    <button class="btn ghost" id="btn-name-restore">🔑 我有恢復碼</button>
+  </div>
+</div>
+
+<div id="cloud" class="screen hidden">
+  <h2>☁️ 雲端存檔</h2>
+  <div class="cloud-box">
+    <p class="stat">暱稱：<b id="cloud-name"></b></p>
+    <p class="stat">你的恢復碼（請截圖保存，刪除遊戲後可以用它找回進度）</p>
+    <div id="cloud-code" class="code">—</div>
+    <p class="stat" id="cloud-status"></p>
+  </div>
+  <div class="btn-row">
+    <button class="btn alt" id="btn-copy-code">📋 複製恢復碼</button>
+    <button class="btn ghost" id="btn-restore-open">🔑 輸入恢復碼</button>
+  </div>
+  <div id="restore-box" class="cloud-box hidden">
+    <input class="field" id="restore-input" placeholder="FRUIT-XXXX-XXXX" maxlength="20" autocomplete="off" autocapitalize="characters">
+    <button class="btn" id="btn-restore">恢復進度</button>
+    <p class="stat" id="restore-msg"></p>
+  </div>
+  <button class="btn ghost" id="btn-cloud-back">返回</button>
 </div>
 
 <div id="stages" class="screen hidden">
@@ -199,6 +241,7 @@
   </div>
 </div>
 
+<script src="firebase-config.js"></script>
 <script>
 'use strict';
 
@@ -304,9 +347,66 @@ const HIT_RADIUS = 0.6; // 判定半徑（相對水果圖示半徑）
 
 // ===== 存檔 =====
 const SAVE_KEY = 'fruitslash_save_v1';
-let save = { coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {} };
+// cloud = { code: 恢復碼, name: 暱稱 }，只存在這支手機，不會上傳到 save 欄位裡
+const defaultSave = () => ({ coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null });
+let save = defaultSave();
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+function persist() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+  cloudSyncSoon();
+}
+
+// ===== 雲端存檔（Firebase Firestore）：每個玩家一份，用恢復碼當鑰匙 =====
+const FIREBASE_VERSION = '10.12.2';
+const CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // 拿掉容易看錯的 0/O、1/I
+const CODE_RE = /^FRUIT-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/;
+const CLOUD = { db: null, api: null, ready: false, state: 'off', lastSync: 0, timer: null, busy: false };
+function newCode() {
+  const r = crypto.getRandomValues(new Uint32Array(8));
+  let s = 'FRUIT-';
+  for (let i = 0; i < 8; i++) { s += CODE_CHARS[r[i] % 32]; if (i === 3) s += '-'; }
+  return s;
+}
+async function cloudInit() {
+  const cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey) { CLOUD.state = 'off'; return; }
+  try {
+    const app = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`);
+    const fs = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`);
+    CLOUD.api = fs; CLOUD.db = fs.getFirestore(app.initializeApp(cfg)); CLOUD.ready = true; CLOUD.state = 'syncing';
+    await cloudSync();
+  } catch (e) { CLOUD.state = 'offline'; }
+  if (state === 'cloud') renderCloud();
+}
+function cloudSyncSoon() { clearTimeout(CLOUD.timer); CLOUD.timer = setTimeout(cloudSync, 2500); }
+async function cloudSync() {
+  if (!CLOUD.ready || !save.cloud || !save.cloud.code || CLOUD.busy) return;
+  CLOUD.busy = true;
+  const { doc, setDoc, serverTimestamp } = CLOUD.api;
+  try {
+    const { cloud, ...data } = save;
+    await setDoc(doc(CLOUD.db, 'saves', cloud.code), {
+      name: cloud.name, save: data, version: VERSION, updatedAt: serverTimestamp(),
+      stats: { coins: save.coins, best: save.best, unlocked: save.unlocked, cleared: Object.keys(save.cleared || {}).length },
+    });
+    CLOUD.lastSync = Date.now(); CLOUD.state = 'ok';
+  } catch (e) { CLOUD.state = 'offline'; }
+  CLOUD.busy = false;
+  if (state === 'cloud') renderCloud();
+}
+// 用恢復碼把雲端的進度載回這支手機（會覆蓋目前的進度）
+async function cloudRestore(input) {
+  const code = input.trim().toUpperCase().replace(/\s+/g, '').replace(/^FRUIT(?!-)/, 'FRUIT-').replace(/^(FRUIT-[^-]{4})(?!-)/, '$1-');
+  if (!CODE_RE.test(code)) throw new Error('恢復碼格式不對，應該像 FRUIT-ABCD-2345');
+  if (!CLOUD.ready) throw new Error('目前連不上雲端，請確認網路後再試一次');
+  const { doc, getDoc } = CLOUD.api;
+  const snap = await getDoc(doc(CLOUD.db, 'saves', code));
+  if (!snap.exists()) throw new Error('找不到這組恢復碼，請再確認一次');
+  const d = snap.data();
+  save = Object.assign(defaultSave(), d.save, { cloud: { code, name: d.name } });
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+  return d.name;
+}
 
 // ===== 畫布 =====
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
@@ -2032,7 +2132,7 @@ cv.addEventListener('pointercancel', endStroke);
 
 // ===== 介面 =====
 const $ = id => document.getElementById(id);
-const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear'];
+const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear', 'cloud', 'nameset'];
 let shopReturn = 'menu', curStage = 0;
 function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', !(state === 'play' || state === 'paused')); }
 
@@ -2048,6 +2148,7 @@ function updateHUD() {
   $('blade-hud').textContent = `${b.icon} ${b.name} Lv.${bladeLvl()}`;
 }
 function goMenu() {
+  if (!save.cloud || !save.cloud.name) return openNameSet();
   state = 'menu'; G = null;
   $('menu-title').textContent = CONFIG.title;
   $('menu-sub').textContent = `專屬 ${CONFIG.herName} 的切水果遊戲 💕`;
@@ -2175,7 +2276,63 @@ $('btn-over-menu').onclick = goMenu;
 $('btn-next').onclick = () => startGame(Math.min(STAGES.length - 1, curStage + 1));
 $('btn-clear-shop').onclick = () => openShop('clear');
 $('btn-clear-menu').onclick = goMenu;
-document.addEventListener('visibilitychange', () => { if (document.hidden) { persist(); pauseGame(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { persist(); pauseGame(); cloudSync(); } });
+
+// ===== 暱稱與雲端存檔畫面 =====
+let cloudReturn = 'menu', restoreArmed = false;
+function openNameSet() { state = 'nameset'; G = null; $('boss-bar').classList.add('hidden'); show('nameset'); }
+function openCloud(from) {
+  cloudReturn = from; state = 'cloud'; restoreArmed = false;
+  $('restore-box').classList.toggle('hidden', from !== 'nameset');
+  $('restore-msg').textContent = ''; $('btn-restore').textContent = '恢復進度';
+  renderCloud(); show('cloud');
+}
+function renderCloud() {
+  const c = save.cloud;
+  $('cloud-name').textContent = c ? c.name : '（還沒取暱稱）';
+  $('cloud-code').textContent = c ? c.code : '—';
+  $('btn-copy-code').classList.toggle('hidden', !c);
+  const t = CLOUD.lastSync ? new Date(CLOUD.lastSync).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+  $('cloud-status').textContent = {
+    off: '⚠️ 雲端還沒設定好，目前進度只存在這支手機',
+    offline: '⚠️ 目前離線，連上網路後會自動同步',
+    syncing: '同步中…',
+    ok: `✅ 已同步到雲端（${t}）`,
+  }[CLOUD.state] || '';
+}
+$('btn-name-ok').onclick = () => {
+  audio();
+  const name = $('name-input').value.trim().slice(0, 12) || '玩家';
+  save.cloud = { code: newCode(), name };
+  persist(); cloudSync();
+  openCloud('menu'); // 先讓玩家看到恢復碼，提醒截圖
+};
+$('btn-name-restore').onclick = () => { audio(); openCloud('nameset'); };
+$('btn-cloud').onclick = () => { audio(); openCloud('menu'); };
+$('btn-cloud-back').onclick = () => { if (cloudReturn === 'nameset' && !(save.cloud && save.cloud.name)) openNameSet(); else goMenu(); };
+$('btn-copy-code').onclick = async () => {
+  const code = save.cloud && save.cloud.code; if (!code) return;
+  try { await navigator.clipboard.writeText(code); $('btn-copy-code').textContent = '✅ 已複製'; }
+  catch (e) { $('btn-copy-code').textContent = '請長按恢復碼複製'; }
+  setTimeout(() => { $('btn-copy-code').textContent = '📋 複製恢復碼'; }, 1800);
+};
+$('btn-restore-open').onclick = () => { $('restore-box').classList.toggle('hidden'); };
+$('btn-restore').onclick = async () => {
+  const input = $('restore-input').value;
+  // 已經有進度的話，要按第二次才會覆蓋
+  if (save.cloud && save.cloud.name && !restoreArmed) {
+    restoreArmed = true; $('btn-restore').textContent = '確定覆蓋目前進度？再按一次';
+    $('restore-msg').textContent = '恢復後，這支手機目前的進度會被雲端的進度取代。';
+    return;
+  }
+  $('restore-msg').textContent = '讀取中…';
+  try {
+    const name = await cloudRestore(input);
+    $('restore-msg').textContent = `✅ 歡迎回來，${name}！`;
+    sfx.win(); CLOUD.lastSync = Date.now(); CLOUD.state = 'ok';
+    setTimeout(goMenu, 900);
+  } catch (e) { $('restore-msg').textContent = '❌ ' + e.message; restoreArmed = false; $('btn-restore').textContent = '恢復進度'; }
+};
 
 // ===== 主迴圈 =====
 let last = performance.now();
@@ -2187,6 +2344,7 @@ function loop(now) {
 }
 goMenu();
 requestAnimationFrame(loop);
+cloudInit();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
