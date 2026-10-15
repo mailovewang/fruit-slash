@@ -390,7 +390,11 @@ async function cloudSync() {
       stats: { coins: save.coins, best: save.best, unlocked: save.unlocked, cleared: Object.keys(save.cleared || {}).length },
     });
     CLOUD.lastSync = Date.now(); CLOUD.state = 'ok';
-  } catch (e) { CLOUD.state = 'offline'; }
+  } catch (e) {
+    // 離線或寫太快被限速擋下：10 秒後自動再試
+    CLOUD.state = 'offline';
+    clearTimeout(CLOUD.timer); CLOUD.timer = setTimeout(cloudSync, 10000);
+  }
   CLOUD.busy = false;
   if (state === 'cloud') renderCloud();
 }
