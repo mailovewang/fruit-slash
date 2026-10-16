@@ -14,7 +14,7 @@ service cloud.firestore {
         && d.keys().hasOnly(['name', 'save', 'version', 'updatedAt', 'stats'])
         && d.name is string && d.name.size() <= 40
         && d.version is string && d.version.size() <= 20
-        && d.save is map && d.save.size() <= 20
+        && d.save is map && d.save.size() <= 40
         && d.stats is map && d.stats.size() <= 10
         && d.updatedAt == request.time;
     }
@@ -29,6 +29,46 @@ service cloud.firestore {
       // 限速：同一份存檔 2 秒內只能寫一次，防止被狂刷
       allow update: if validSave(code) && request.time > resource.data.updatedAt + duration.value(2, 's');
 
+      allow delete: if isAdmin();
+    }
+
+    function authed() { return request.auth != null; }
+    function fcode(c) { return c is string && c.matches('[2-9A-HJ-NP-Z]{6}'); }
+    function shortStr(v, n) { return v is string && v.size() <= n; }
+    function num(v, n) { return v is int && v >= 0 && v <= n; }
+
+    // 公開資料（排行榜、好友用），文件 ID 是匿名登入的 uid，只有本人能改
+    match /profiles/{uid} {
+      allow read: if true;
+      allow write: if authed() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['code', 'name', 'title', 'blade', 'best', 'endless', 'cleared', 'updatedAt'])
+        && fcode(request.resource.data.code) && shortStr(request.resource.data.name, 40)
+        && shortStr(request.resource.data.title, 40) && shortStr(request.resource.data.blade, 20)
+        && num(request.resource.data.best, 99999) && num(request.resource.data.endless, 999) && num(request.resource.data.cleared, 50)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    // 好友禮物：文件 ID = 送的人_收的人_日期，所以每天每位好友只能送一次（不能覆蓋）
+    match /gifts/{id} {
+      allow read, delete: if authed();
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'day', 'at'])
+        && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
+        && shortStr(request.resource.data.day, 12) && request.resource.data.at == request.time
+        && id == request.resource.data.from + '_' + request.resource.data.to + '_' + request.resource.data.day;
+    }
+
+    // 挑戰賽：建立時還沒有對手分數；對手只能填一次自己的分數
+    match /challenges/{id} {
+      allow read: if authed();
+      allow create: if authed()
+        && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'seed', 'score', 'reply', 'replyName', 'at'])
+        && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
+        && num(request.resource.data.seed, 2147483647) && num(request.resource.data.score, 99999)
+        && request.resource.data.reply == null && request.resource.data.replyName == null && request.resource.data.at == request.time;
+      allow update: if authed() && resource.data.reply == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'replyName'])
+        && num(request.resource.data.reply, 99999) && shortStr(request.resource.data.replyName, 40);
       allow delete: if isAdmin();
     }
   }

@@ -223,6 +223,39 @@
   }
   /* ===== 1.8：主選單小按鈕、每日任務、成就、通知、刀光 ===== */
   .sub-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  /* ===== 1.9：好友、排行榜、挑戰 ===== */
+  #friends, #rank { justify-content: flex-start; gap: 8px; }
+  #friends h2, #rank h2 { margin: 0; font-size: 22px; }
+  .fcode { font: 900 18px ui-monospace, Consolas, monospace; letter-spacing: 2px; color: var(--gold); user-select: all; -webkit-user-select: all; }
+  .friends-body { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 980px; }
+  #friend-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; align-content: start; }
+  .fcard { background: var(--panel); border: 2px solid rgba(255,158,192,.25); border-radius: 14px; padding: 8px 10px; text-align: left; }
+  .fcard .fn { font-weight: 800; font-size: 15px; }
+  .fcard .fi { font-size: 11px; color: var(--muted); margin: 2px 0 6px; }
+  .frow { display: flex; gap: 6px; }
+  .frow .btn { flex: 1; min-width: 0; white-space: nowrap; padding: 6px 8px; font-size: 13px; box-shadow: none; }
+  .frow .btn.ghost { flex: 0 0 auto; }
+  .friend-side { display: flex; flex-direction: column; gap: 6px; }
+  .add-row { display: flex; gap: 8px; }
+  .add-row .field { flex: 1; font-size: 16px; padding: 7px 12px; letter-spacing: 2px; }
+  #friend-msg { margin: 0; min-height: 1em; }
+  #friend-inbox { display: flex; flex-direction: column; gap: 6px; }
+  #friend-inbox .btn { font-size: 13px; padding: 7px 10px; }
+  #friend-inbox .stat { margin: 0; font-size: 12px; text-align: left; }
+  #rank .tabs { max-width: 260px; }
+  #rank-list { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 3px; }
+  .rrow { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; background: var(--panel); border-radius: 10px; padding: 3px 12px; font-size: 14px; text-align: left; }
+  .rrow.me { border: 2px solid var(--gold); }
+  .rrow .rk { font-weight: 900; }
+  .rrow small { color: var(--muted); font-size: 11px; }
+  .rrow .rv { color: var(--gold); font-weight: 900; }
+  #rank-me { margin: 0; }
+  @media (orientation: landscape) {
+    .friends-body { flex-direction: row; align-items: flex-start; }
+    #friend-list { flex: 1.4; grid-template-columns: 1fr 1fr; }
+    .friend-side { flex: 1; }
+    #rank .shop-head { flex-wrap: wrap; }
+  }
   .sub-row .btn { min-width: 0; padding: 8px 14px; font-size: 14px; box-shadow: none; }
   #menu-title-chip { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: rgba(255,209,102,.2); color: var(--gold); font-size: 13px; }
   #missions h2, #ach h2, #settings h2 { margin: 0; font-size: 24px; }
@@ -293,7 +326,8 @@
   <button class="btn ghost" id="btn-checkin-open">📅 每日簽到</button>
   <button class="btn ghost" id="btn-missions">🎯 每日任務</button>
   <button class="btn ghost" id="btn-ach">🏅 成就</button>
-  <button class="btn ghost" id="btn-cloud">☁️ 雲端存檔</button>
+  <button class="btn ghost" id="btn-rank">🏆 排行榜</button>
+  <button class="btn ghost" id="btn-friends">👫 好友</button>
   <button class="btn ghost" id="btn-settings">⚙️ 設定</button>
   </div>
   <p class="stat hint" style="max-width:300px">滑動手指切水果！不要切到 💣<br>每關打倒 5 隻 Boss 就能解鎖下一關</p>
@@ -369,7 +403,43 @@
     <button class="btn ghost" id="set-sfx"></button>
     <button class="btn ghost" id="set-vibe"></button>
   </div>
+  <button class="btn ghost" id="btn-settings-cloud">☁️ 雲端存檔・恢復碼</button>
   <button class="btn" id="btn-settings-back">返回</button>
+</div>
+
+<div id="friends" class="screen hidden">
+  <div class="shop-head">
+    <button class="btn ghost small" id="btn-friends-back">← 返回</button>
+    <h2>👫 好友</h2>
+    <span class="stat">我的好友碼 <b id="my-friend-code" class="fcode">------</b></span>
+    <button class="btn ghost small" id="btn-copy-friend">📋 複製</button>
+  </div>
+  <div class="friends-body">
+    <div id="friend-list"></div>
+    <div class="friend-side">
+      <div class="add-row"><input class="field" id="friend-input" maxlength="8" placeholder="輸入好友碼" autocomplete="off" autocapitalize="characters"><button class="btn small" id="btn-add-friend">加好友</button></div>
+      <p class="stat" id="friend-msg"></p>
+      <div id="friend-inbox"></div>
+    </div>
+  </div>
+</div>
+
+<div id="rank" class="screen hidden">
+  <div class="shop-head">
+    <button class="btn ghost small" id="btn-rank-back">← 返回</button>
+    <h2>🏆 排行榜</h2>
+    <div class="tabs"><button class="tab rtab active" data-r="best">最高分</button><button class="tab rtab" data-r="endless">無盡</button><button class="tab rtab" data-r="cleared">通關</button></div>
+    <div class="tabs"><button class="tab rtab active" data-s="all">全部</button><button class="tab rtab" data-s="friends">好友</button></div>
+  </div>
+  <div id="rank-list"></div>
+  <p class="stat" id="rank-me"></p>
+</div>
+
+<div id="chalres" class="screen hidden">
+  <h1 class="title">挑戰結束</h1>
+  <div class="big-score" id="chal-score">0</div>
+  <p class="subtitle" id="chal-text"></p>
+  <button class="btn" id="btn-chal-back">回好友頁</button>
 </div>
 
 <div id="stages" class="screen hidden">
@@ -566,9 +636,16 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.8.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '1.9.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.9.0': [
+    '👫 新增好友：每個人都有一組 6 碼好友碼，輸入朋友的好友碼就能加好友',
+    '🎁 每天可以送每位好友一份禮物（對方收到 100 金幣）',
+    '⚔️ 新增好友挑戰賽：60 秒比分數，雙方的水果出現順序完全一樣，最公平',
+    '🏆 新增排行榜：最高分、無盡模式、通關數，可以看全部玩家或只看好友',
+    '☁️ 雲端存檔按鈕移到「⚙️ 設定」裡面',
+  ],
   '1.8.0': [
     '🎯 新增每日任務：每天 3 個任務，完成領金幣',
     '🏅 新增 18 個成就：達成自動領獎，還能把成就設成稱號顯示在主選單',
@@ -649,7 +726,12 @@ async function cloudInit() {
       const ac = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app-check.js`);
       CLOUD.appCheck = ac.initializeAppCheck(fbApp, { provider: new ac.ReCaptchaEnterpriseProvider(window.RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true }); CLOUD.acApi = ac;
     }
+    try {
+      const au = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`);
+      const cred = await au.signInAnonymously(au.getAuth(fbApp)); CLOUD.uid = cred.user.uid;
+    } catch (e) {}
     CLOUD.api = fs; CLOUD.db = fs.getFirestore(fbApp); CLOUD.ready = true; CLOUD.state = 'syncing';
+    publishProfile();
     await cloudSync();
     if (CLOUD.state === 'syncing') CLOUD.state = 'ok'; // 還沒取暱稱時沒有東西要同步
   } catch (e) { CLOUD.state = 'offline'; }
@@ -1071,14 +1153,15 @@ function newGame(stage) {
 }
 const gravity = () => H * 1.25;
 
+const R = () => (G && G.rand ? G.rand() : Math.random());
 function launch(kind, opts) {
   const r = S * 0.075;
-  const o = { kind, x: W * (0.15 + Math.random() * 0.7), y: H + r, r, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 6, dead: false };
-  const g = gravity(), peak = H * (0.45 + Math.random() * 0.35);
+  const o = { kind, x: W * (0.15 + R() * 0.7), y: H + r, r, rot: R() * 6, vr: (R() - 0.5) * 6, dead: false };
+  const g = gravity(), peak = H * (0.45 + R() * 0.35);
   o.vy = -Math.sqrt(2 * g * peak);
-  const tx = W * (0.25 + Math.random() * 0.5);
+  const tx = W * (0.25 + R() * 0.5);
   o.vx = (tx - o.x) / ((-o.vy / g) * 1.6);
-  if (kind === 'fruit') { const f = FRUITS[Math.random() * FRUITS.length | 0]; o.f = f; o.art = f.id; o.r = r * (f.s || 1); }
+  if (kind === 'fruit') { const f = FRUITS[R() * FRUITS.length | 0]; o.f = f; o.art = f.id; o.r = r * (f.s || 1); }
   else if (kind === 'bomb') { o.art = 'bomb'; o.r = r * 0.95; }
   else if (kind === 'star') { o.e = '🌟'; o.r = r * 0.85; }
   else if (kind === 'heart') { o.e = '💗'; o.r = r * 0.85; }
@@ -1087,7 +1170,7 @@ function launch(kind, opts) {
   return o;
 }
 function pickKind(diff) {
-  const r = Math.random(), bomb = (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * perkLvl('bomb'));
+  const r = R(), bomb = (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * perkLvl('bomb'));
   const star = 0.03 + 0.012 * perkLvl('star'), heart = 0.015 + 0.01 * perkLvl('heart');
   if (r < bomb) return 'bomb';
   if (r < bomb + star) return 'star';
@@ -1335,6 +1418,7 @@ function explodeBomb(o) {
   juice(o.x, o.y, '#ffb703', 24, 1.6); juice(o.x, o.y, '#333', 16, 1.2);
   G.flash = 0.35; G.flashColor = '#fff'; G.shake = 0.45;
   sfx.bomb(); buzz(250);
+  if (G.chal) { G.score = Math.max(0, G.score - 10); text(o.x, o.y, '-10', '#ff4d6d', 0.08); updateHUD(); return; }
   text(o.x, o.y, '-❤️', '#ff4d6d', 0.08);
   loseHeart();
 }
@@ -1360,7 +1444,7 @@ function updateZones(dt, rdt) {
 }
 
 function loseHeart() {
-  if (G.overT > 0 || G.done) return;
+  if (G.overT > 0 || G.done || G.chal) return;
   // 聖光刀的護盾：抵擋一次
   if (G.shield > 0) { G.shield--; text(W / 2, H * 0.5, '🛡️ 護盾抵擋！', '#fff3b0', 0.08, 1); ring(W / 2, H * 0.5, S * 0.3, '#ffd166', 0.5); updateHUD(); return; }
   G.hearts--;
@@ -2210,6 +2294,11 @@ function update(rdt) {
   const dt = rdt * G.timeScale, g = gravity();
 
   if (G.overT > 0) { G.overT -= rdt; if (G.overT <= 0) { gameOver(); return; } }
+  if (G.chal) {
+    const left = Math.max(0, Math.ceil(CHAL_TIME - G.time));
+    if (left !== G.chalLeft) { G.chalLeft = left; $('stage-hud').textContent = `⚔️ 挑戰 ${G.chal.toName}・剩 ${left} 秒`; }
+    if (G.time >= CHAL_TIME && G.objs.every(o => o.dead || o.kind === 'bomb')) { challengeEnd(); return; }
+  }
   if (G.clearT > 0) { G.clearT -= rdt; if (G.clearT <= 0) { stageClear(); return; } }
   if (G.fin) { updateFinisher(G.fin, rdt); if (G.fin.t >= G.fin.dur) { G.fin = null; finishBoss(); } }
 
@@ -2217,11 +2306,11 @@ function update(rdt) {
   if (!G.boss && !G.done && G.score >= G.nextBoss) spawnBoss();
   if (G.warnT > 0) G.warnT -= rdt;
   G.spawnT -= dt;
-  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin) {
+  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.chal && G.time >= CHAL_TIME)) {
     // 難度慢慢上升（400 分才到最難）；一次最多 3 顆，最後一關最多 4 顆，而且一顆一顆錯開飛出來
-    const diff = Math.min(1, G.score / 400);
+    const diff = G.chal ? Math.min(1, G.time / 45) : Math.min(1, G.score / 400);
     G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1);
-    const n = 1 + Math.floor(Math.random() * (1 + diff * 2 + (G.st.diff - 1)));
+    const n = 1 + Math.floor(R() * (1 + diff * 2 + (G.st.diff - 1)));
     for (let i = 0; i < n; i++) G.pending.push({ t: i * 0.28, kind: pickKind(diff) });
   }
   for (const p of G.pending) { p.t -= dt; if (p.t <= 0) { launch(p.kind); p.done = true; } }
@@ -2955,7 +3044,7 @@ function drawBladeArt(g, id, px) {
 
 // ===== 介面 =====
 const $ = id => document.getElementById(id);
-const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear', 'cloud', 'nameset', 'checkin', 'whatsnew', 'missions', 'ach', 'settings'];
+const screens = ['menu', 'stages', 'shop', 'pause', 'over', 'clear', 'cloud', 'nameset', 'checkin', 'whatsnew', 'missions', 'ach', 'settings', 'friends', 'rank', 'chalres'];
 let shopReturn = 'menu', curStage = 0;
 function show(id) { for (const s of screens) $(s).classList.toggle('hidden', s !== id); $('hud').classList.toggle('hidden', !(state === 'play' || state === 'paused')); requestAnimationFrame(updateScrollHint); }
 // 畫面內容超出螢幕、而且還沒滑到底時，在底部顯示提示，避免玩家找不到下面的按鈕
@@ -2969,7 +3058,7 @@ function updateHUD() {
   if (!G) return;
   $('score').textContent = G.score;
   $('best-hud').textContent = '最高 ' + Math.max((G.endless ? save.endlessBestScore : save.stageBest[G.stage]) || 0, G.score);
-  $('stage-hud').textContent = G.endless ? `♾️ 無盡模式・${G.st.icon} ${G.st.name}・已打倒 ${G.bossIndex} 隻` : `${G.st.icon} ${G.st.name}・Boss ${G.bossIndex}/5`;
+  if (!G.chal) $('stage-hud').textContent = G.endless ? `♾️ 無盡模式・${G.st.icon} ${G.st.name}・已打倒 ${G.bossIndex} 隻` : `${G.st.icon} ${G.st.name}・Boss ${G.bossIndex}/5`;
   const slots = Math.max(START_HEARTS + perkLvl('life'), G.hearts);
   $('hearts').textContent = '❤️'.repeat(Math.max(0, G.hearts)) + '🤍'.repeat(Math.max(0, slots - G.hearts)) + (G.shield ? '🛡️' : '');
   $('coins-hud').textContent = '💰 ' + save.coins;
@@ -3043,6 +3132,7 @@ function renderStages() {
 function startGame(stage) { if (stage === 'endless') return startEndless(); audio(); curStage = stage; newGame(stage); state = 'play'; show(null); track('game'); updateHUD(); }
 function pauseGame() { if (state !== 'play') return; state = 'paused'; persist(); show('pause'); }
 function recordScore() {
+  if (G.chal) return false;
   if (G.endless) { track('endlessBest', G.bossIndex); save.endlessBestScore = Math.max(save.endlessBestScore || 0, G.score); const rec = G.score > save.best; if (rec) save.best = G.score; return rec; }
   save.stageBest[G.stage] = Math.max(save.stageBest[G.stage] || 0, G.score);
   const rec = G.score > save.best;
@@ -3052,7 +3142,7 @@ function recordScore() {
 function gameOver() {
   state = 'over';
   const rec = recordScore();
-  persist();
+  persist(); publishProfile();
   $('over-score').textContent = G.score; $('over-best').textContent = save.best; $('over-coins').textContent = G.coinsEarned;
   $('over-record').classList.toggle('hidden', !rec);
   $('boss-bar').classList.add('hidden');
@@ -3196,7 +3286,6 @@ $('btn-name-ok').onclick = () => {
   openCloud('menu'); // 先讓玩家看到恢復碼，提醒截圖
 };
 $('btn-name-restore').onclick = () => { audio(); openCloud('nameset'); };
-$('btn-cloud').onclick = () => { audio(); openCloud('menu'); };
 $('btn-cloud-back').onclick = () => { if (cloudReturn === 'nameset' && !(save.cloud && save.cloud.name)) openNameSet(); else goMenu(); };
 $('btn-copy-code').onclick = async () => {
   const code = save.cloud && save.cloud.code; if (!code) return;
@@ -3520,6 +3609,207 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || swReloaded) return; swReloaded = true; location.reload(); });
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => reg.update()).catch(() => {});
 }
+
+// ===== 社交功能：好友碼、排行榜、互送禮物、挑戰賽（Firebase 匿名登入 + Firestore） =====
+// 好友碼是公開的（用來加好友），恢復碼是私密的（用來找回存檔），兩個不一樣
+const SOCIAL = { ready: false };
+function friendCode() {
+  if (!save.friendCode) {
+    const r = crypto.getRandomValues(new Uint32Array(6));
+    save.friendCode = [...r].map(v => CODE_CHARS[v % 32]).join('');
+    persist();
+  }
+  return save.friendCode;
+}
+const myName = () => (save.cloud && save.cloud.name) || '玩家';
+const socialOk = () => CLOUD.ready && CLOUD.uid;
+// 自己的公開資料：排行榜和好友頁會讀這份
+async function publishProfile() {
+  if (!socialOk() || !save.cloud) return;
+  const { doc, setDoc, serverTimestamp } = CLOUD.api, t = titleOf();
+  try {
+    await setDoc(doc(CLOUD.db, 'profiles', CLOUD.uid), {
+      code: friendCode(), name: myName(), title: t ? t.icon + ' ' + t.name : '', blade: save.equipped,
+      best: Math.min(99999, save.best | 0), endless: Math.min(999, stats().endlessBest | 0),
+      cleared: Object.keys(save.cleared || {}).length, updatedAt: serverTimestamp(),
+    });
+  } catch (e) {}
+}
+// 用好友碼查公開資料（換手機會產生新的資料，取最新的那份）
+async function findProfiles(codes) {
+  if (!socialOk() || !codes.length) return {};
+  const { collection, getDocs, query, where } = CLOUD.api, out = {};
+  for (let i = 0; i < codes.length; i += 30) {
+    const snap = await getDocs(query(collection(CLOUD.db, 'profiles'), where('code', 'in', codes.slice(i, i + 30))));
+    snap.forEach(d => { const p = d.data(), t = p.updatedAt ? p.updatedAt.toMillis() : 0; if (!out[p.code] || out[p.code]._t < t) out[p.code] = Object.assign(p, { _t: t }); });
+  }
+  return out;
+}
+const bladeIconOf = id => (BLADES.find(b => b.id === id) || BLADES[0]).icon;
+const todayKey = () => todayStr();
+
+// ----- 好友頁 -----
+let friendsCache = {}, inbox = { gifts: [], challenges: [], sent: [] };
+async function openFriends() {
+  state = 'friends'; show('friends');
+  $('my-friend-code').textContent = friendCode();
+  $('friend-msg').textContent = socialOk() ? '讀取中…' : '⚠️ 需要網路才能使用好友功能';
+  renderFriends();
+  if (!socialOk()) return;
+  await publishProfile();
+  try { friendsCache = await findProfiles(save.friends || []); await loadInbox(); $('friend-msg').textContent = ''; }
+  catch (e) { $('friend-msg').textContent = '⚠️ 讀取失敗，請稍後再試'; }
+  renderFriends();
+}
+async function loadInbox() {
+  const { collection, getDocs, query, where } = CLOUD.api, me = friendCode();
+  const [g, c, s] = await Promise.all([
+    getDocs(query(collection(CLOUD.db, 'gifts'), where('to', '==', me))),
+    getDocs(query(collection(CLOUD.db, 'challenges'), where('to', '==', me))),
+    getDocs(query(collection(CLOUD.db, 'challenges'), where('from', '==', me))),
+  ]);
+  inbox.gifts = g.docs.map(d => ({ id: d.id, ...d.data() }));
+  inbox.challenges = c.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.reply == null);
+  inbox.sent = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.at ? b.at.toMillis() : 0) - (a.at ? a.at.toMillis() : 0)).slice(0, 4);
+}
+function renderFriends() {
+  const list = $('friend-list'); list.innerHTML = '';
+  const codes = save.friends || [];
+  if (!codes.length) list.innerHTML = '<p class="stat">還沒有好友。把你的好友碼傳給朋友，或在右邊輸入朋友的好友碼！</p>';
+  for (const code of codes) {
+    const p = friendsCache[code], card = document.createElement('div'), sentToday = save.giftSent && save.giftSent[code] === todayKey();
+    card.className = 'fcard';
+    card.innerHTML = `<div class="fn">${p ? bladeIconOf(p.blade) + ' ' + p.name : '❓ ' + code}</div>
+      <div class="fi">${p ? (p.title ? p.title + '・' : '') + '最高 ' + p.best + '・通關 ' + p.cleared : '找不到這個好友碼'}</div>`;
+    const row = document.createElement('div'); row.className = 'frow';
+    const mk = (label, cls, dis, fn) => { const b = document.createElement('button'); b.className = 'btn small ' + cls; b.textContent = label; b.disabled = dis; b.onclick = () => { audio(); fn(); }; row.appendChild(b); };
+    mk(sentToday ? '🎁 已送' : '🎁 送禮', '', sentToday || !p, () => sendGift(code));
+    mk('⚔️ 挑戰', 'alt', !p, () => startChallenge({ mode: 'send', to: code, toName: p.name }));
+    mk('✕', 'ghost', false, () => { save.friends = codes.filter(c => c !== code); persist(); renderFriends(); });
+    card.appendChild(row); list.appendChild(card);
+  }
+  // 收件匣：禮物、別人的挑戰、自己發出去的挑戰結果
+  const ib = $('friend-inbox'); ib.innerHTML = '';
+  if (inbox.gifts.length) {
+    const b = document.createElement('button'); b.className = 'btn small'; b.textContent = `🎁 收到 ${inbox.gifts.length} 份禮物，全部領取（+${inbox.gifts.length * GIFT_COINS}）`;
+    b.onclick = () => { audio(); claimGifts(); }; ib.appendChild(b);
+  }
+  for (const c of inbox.challenges) {
+    const b = document.createElement('button'); b.className = 'btn small alt'; b.textContent = `⚔️ ${c.fromName} 挑戰你（${c.score} 分）→ 應戰`;
+    b.onclick = () => { audio(); startChallenge({ mode: 'reply', id: c.id, seed: c.seed, toName: c.fromName, theirScore: c.score }); }; ib.appendChild(b);
+  }
+  for (const c of inbox.sent) {
+    const p = document.createElement('p'); p.className = 'stat';
+    p.textContent = c.reply == null ? `⏳ 你挑戰 ${friendsCache[c.to] ? friendsCache[c.to].name : c.to}（${c.score} 分），等待應戰` : `${c.reply > c.score ? '😢 輸給' : c.reply === c.score ? '🤝 平手' : '🏆 贏了'} ${c.replyName}：你 ${c.score} vs ${c.reply}`;
+    ib.appendChild(p);
+  }
+  $('btn-friends').textContent = inbox.gifts.length || inbox.challenges.length ? '👫 好友 ❗' : '👫 好友';
+}
+async function addFriend() {
+  const code = $('friend-input').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const msg = $('friend-msg');
+  if (!/^[2-9A-HJ-NP-Z]{6}$/.test(code)) return (msg.textContent = '❌ 好友碼是 6 個英文字母或數字');
+  if (code === friendCode()) return (msg.textContent = '❌ 這是你自己的好友碼');
+  save.friends = save.friends || [];
+  if (save.friends.includes(code)) return (msg.textContent = '已經是好友了');
+  if (save.friends.length >= 20) return (msg.textContent = '❌ 好友最多 20 位');
+  msg.textContent = '查詢中…';
+  try {
+    const found = await findProfiles([code]);
+    if (!found[code]) return (msg.textContent = '❌ 找不到這個好友碼，請對方先打開一次遊戲的好友頁');
+    save.friends.push(code); friendsCache[code] = found[code]; persist();
+    $('friend-input').value = ''; msg.textContent = `✅ 已加入好友：${found[code].name}`; sfx.coin();
+    renderFriends();
+  } catch (e) { msg.textContent = '⚠️ 查詢失敗，請檢查網路'; }
+}
+// ----- 禮物：每位好友每天可以送一次，對方收到 100 金幣 -----
+const GIFT_COINS = 100;
+async function sendGift(code) {
+  const { doc, setDoc, serverTimestamp } = CLOUD.api, me = friendCode(), day = todayKey();
+  try {
+    await setDoc(doc(CLOUD.db, 'gifts', `${me}_${code}_${day}`), { from: me, fromName: myName(), to: code, day, at: serverTimestamp() });
+    save.giftSent = save.giftSent || {}; save.giftSent[code] = day; persist();
+    $('friend-msg').textContent = '🎁 禮物已送出！'; sfx.coin();
+  } catch (e) { save.giftSent = save.giftSent || {}; save.giftSent[code] = day; $('friend-msg').textContent = '今天已經送過這位好友了'; }
+  renderFriends();
+}
+async function claimGifts() {
+  const { doc, deleteDoc } = CLOUD.api; let n = 0;
+  for (const g of inbox.gifts) { try { await deleteDoc(doc(CLOUD.db, 'gifts', g.id)); n++; } catch (e) {} }
+  save.coins += n * GIFT_COINS; persist(); inbox.gifts = [];
+  $('friend-msg').textContent = `✅ 領取 ${n} 份禮物，+${n * GIFT_COINS} 💰`; sfx.win(); renderFriends();
+}
+
+// ----- 挑戰賽：60 秒，雙方的水果出現順序完全一樣，比分數 -----
+const CHAL_TIME = 60;
+function startChallenge(c) {
+  audio();
+  c.seed = c.seed || (crypto.getRandomValues(new Uint32Array(1))[0] % 2147483646) + 1;
+  curStage = 0; newGame(0);
+  G.chal = c; G.rand = rng(c.seed); G.hearts = 3; G.nextBoss = Infinity;
+  state = 'play'; show(null); track('game'); updateHUD();
+}
+async function challengeEnd() {
+  const c = G.chal, score = G.score;
+  state = 'chalres'; show('chalres');
+  $('chal-score').textContent = score;
+  let txt = '';
+  try {
+    if (c.mode === 'send') {
+      const { collection, addDoc, serverTimestamp } = CLOUD.api;
+      await addDoc(collection(CLOUD.db, 'challenges'), { from: friendCode(), fromName: myName(), to: c.to, seed: c.seed, score, reply: null, replyName: null, at: serverTimestamp() });
+      txt = `已把挑戰送給 ${c.toName}！等對方應戰後，到好友頁看結果`;
+    } else {
+      const { doc, updateDoc } = CLOUD.api;
+      await updateDoc(doc(CLOUD.db, 'challenges', c.id), { reply: score, replyName: myName() });
+      txt = score > c.theirScore ? `🏆 你贏了！${c.toName} ${c.theirScore} 分` : score === c.theirScore ? `🤝 平手！都是 ${score} 分` : `😢 差一點！${c.toName} ${c.theirScore} 分`;
+      if (score > c.theirScore) sfx.win();
+    }
+  } catch (e) { txt = '⚠️ 結果上傳失敗，請檢查網路'; }
+  $('chal-text').textContent = txt;
+  if (save.best < score) save.best = score;
+  persist(); publishProfile();
+}
+
+// ----- 排行榜：總分、無盡模式、通關數；全部玩家或只看好友 -----
+const RANK_TABS = { best: '最高分', endless: '無盡模式（Boss 數）', cleared: '通關數' };
+let rankTab = 'best', rankScope = 'all';
+async function openRank() { state = 'rank'; show('rank'); await publishProfile(); renderRank(); }
+async function renderRank() {
+  for (const b of document.querySelectorAll('.rtab')) b.classList.toggle('active', b.dataset.r === rankTab || b.dataset.s === rankScope);
+  const list = $('rank-list'), me = friendCode();
+  if (!socialOk()) { list.innerHTML = '<p class="stat">⚠️ 需要網路才能看排行榜</p>'; return; }
+  list.innerHTML = '<p class="stat">讀取中…</p>';
+  try {
+    let rows;
+    if (rankScope === 'friends') rows = Object.values(await findProfiles([me, ...(save.friends || [])]));
+    else {
+      const { collection, getDocs, query, orderBy, limit } = CLOUD.api;
+      const snap = await getDocs(query(collection(CLOUD.db, 'profiles'), orderBy(rankTab, 'desc'), limit(40)));
+      const seen = {}; rows = [];
+      snap.forEach(d => { const p = d.data(); if (!seen[p.code]) { seen[p.code] = 1; rows.push(p); } });
+    }
+    rows.sort((a, b) => (b[rankTab] || 0) - (a[rankTab] || 0));
+    const top = rows.slice(0, 10), myIdx = rows.findIndex(p => p.code === me);
+    list.innerHTML = '';
+    top.forEach((p, i) => {
+      const row = document.createElement('div'); row.className = 'rrow' + (p.code === me ? ' me' : '');
+      row.innerHTML = `<span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rn">${bladeIconOf(p.blade)} ${p.name}${p.title ? ' <small>' + p.title + '</small>' : ''}</span><span class="rv">${p[rankTab] || 0}</span>`;
+      list.appendChild(row);
+    });
+    $('rank-me').textContent = myIdx >= 10 ? `你的名次：第 ${myIdx + 1} 名` : myIdx < 0 ? '打完一局就會出現在排行榜上' : '';
+  } catch (e) { list.innerHTML = '<p class="stat">⚠️ 讀取失敗，請稍後再試</p>'; }
+}
+for (const b of document.querySelectorAll('.rtab')) b.onclick = () => { audio(); if (b.dataset.r) rankTab = b.dataset.r; if (b.dataset.s) rankScope = b.dataset.s; renderRank(); };
+
+$('btn-friends').onclick = () => { audio(); openFriends(); };
+$('btn-friends-back').onclick = () => goMenu();
+$('btn-add-friend').onclick = () => { audio(); addFriend(); };
+$('btn-copy-friend').onclick = async () => { try { await navigator.clipboard.writeText(friendCode()); $('friend-msg').textContent = '✅ 已複製好友碼'; } catch (e) { $('friend-msg').textContent = '請長按好友碼複製'; } };
+$('btn-rank').onclick = () => { audio(); openRank(); };
+$('btn-rank-back').onclick = () => goMenu();
+$('btn-chal-back').onclick = () => openFriends();
+$('btn-settings-cloud').onclick = () => { audio(); openCloud('menu'); };
 </script>
 </body>
 </html>
