@@ -642,9 +642,16 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.9.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '1.9.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.9.1': [
+    '⚔️ 好友挑戰賽更公平：雙方一律用基本小刀、不算強化，水果出現的順序和數量完全一樣',
+    '🏆 挑戰賽的分數不再算進最高分',
+    '🔥 連斬只算手指真的劃到的水果，刀的特效連鎖不算',
+    '🔒 修正排行榜、好友頁的安全問題',
+    '📱 安裝新版 APK 後：切到 Boss 會震動、按手機的返回鍵會暫停或回上一頁',
+  ],
   '1.9.0': [
     '👫 新增好友：每個人都有一組 6 碼好友碼，輸入朋友的好友碼就能加好友',
     '🎁 每天可以送每位好友一份禮物（對方收到 100 金幣）',
@@ -1108,14 +1115,23 @@ const sfx = {
   freeze() { tone(1200, 2400, 0.4, 0.08, 'sine'); tone(1800, 3600, 0.4, 0.05, 'sine', 0.05); },
   boom() { noise(0.25, 600, 0.35, 'lowpass'); },
 };
-function buzz(ms) { if (!settings().vibe) return; try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
+// APK 裡的瀏覽器不支援網頁震動，改叫手機原生的震動功能（需要 APK 1.3 以上；舊 APK、網頁版照舊用 navigator.vibrate）
+const NATIVE = (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins) || {};
+function buzz(ms) {
+  if (!settings().vibe) return;
+  try {
+    if (NATIVE.Haptics) { const d = Array.isArray(ms) ? ms.filter((_, i) => i % 2 === 0).reduce((a, b) => a + b, 0) : ms; NATIVE.Haptics.vibrate({ duration: d }).catch(() => {}); }
+    else if (navigator.vibrate) navigator.vibrate(ms);
+  } catch (e) {}
+}
 
 // ===== 刀具數值 =====
-const blade = () => BLADES.find(b => b.id === save.equipped) || BLADES[0];
-const bladeLvl = () => save.levels[save.equipped] || 1;
+// 好友挑戰賽一律用基本小刀，雙方條件一樣才公平
+const blade = () => (G && G.chal ? BLADES[0] : BLADES.find(b => b.id === save.equipped) || BLADES[0]);
+const bladeLvl = () => (G && G.chal ? 1 : save.levels[save.equipped] || 1);
 const dmgOf = (b, lvl) => +(b.power * (1 + (lvl - 1) * 0.5)).toFixed(1);
-const coinMult = () => save.equipped === 'galaxy' ? 1.5 : save.equipped === 'love' ? 1.25 : 1;
-const hitMul = () => save.equipped === 'wind' ? 1.3 + 0.12 * bladeLvl() : 1;
+const coinMult = () => blade().id === 'galaxy' ? 1.5 : blade().id === 'love' ? 1.25 : 1;
+const hitMul = () => blade().id === 'wind' ? 1.3 + 0.12 * bladeLvl() : 1;
 const upgradeCost = (b, lvl) => Math.round((b.price * 0.3 + 60) * Math.pow(1.6, lvl - 1)); // 每升一級貴 1.6 倍
 // 刀的解鎖條件：req 1～5 = 要解鎖到第幾關，6 = 打通全部關卡
 const bladeUnlocked = b => !b.special && (b.req || 1) <= save.unlocked + (save.cleared[STAGES.length - 1] ? 1 : 0);
@@ -1176,11 +1192,13 @@ function launch(kind, opts) {
   return o;
 }
 function pickKind(diff) {
-  const r = R(), bomb = (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * perkLvl('bomb'));
-  const star = 0.03 + 0.012 * perkLvl('star'), heart = 0.015 + 0.01 * perkLvl('heart');
+  // 挑戰賽不算強化等級、也不看目前愛心數，雙方出現的東西才會完全一樣
+  const pl = id => (G.chal ? 0 : perkLvl(id));
+  const r = R(), bomb = (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
+  const star = 0.03 + 0.012 * pl('star'), heart = 0.015 + 0.01 * pl('heart');
   if (r < bomb) return 'bomb';
   if (r < bomb + star) return 'star';
-  if (r < bomb + star + heart && G.hearts < MAX_HEARTS) return 'heart';
+  if (r < bomb + star + heart && (G.chal || G.hearts < MAX_HEARTS)) return 'heart';
   return 'fruit';
 }
 
@@ -1279,7 +1297,7 @@ function hitObj(o, ang, byEffect, off = 0) {
   G.score += 1;
   addCoins(coinMult());
   if (o.kind === 'fruit') track('fruit');
-  G.strokeCount++;
+  if (!byEffect) G.strokeCount++; // 連斬只算手指真的劃到的，刀的特效連鎖不算
   if (o.kind === 'star') { track('star'); const c = addCoins(5 * coinMult()); text(o.x, o.y, `+${c} 💰`, '#ffd166'); sfx.coin(); }
   if (o.kind === 'heart') { G.hearts = Math.min(MAX_HEARTS, G.hearts + 1); text(o.x, o.y, '+❤️', '#ff5c8a'); sfx.coin(); }
   sfx.slice();
@@ -2303,7 +2321,7 @@ function update(rdt) {
   if (G.chal) {
     const left = Math.max(0, Math.ceil(CHAL_TIME - G.time));
     if (left !== G.chalLeft) { G.chalLeft = left; $('stage-hud').textContent = `⚔️ 挑戰 ${G.chal.toName}・剩 ${left} 秒`; }
-    if (G.time >= CHAL_TIME && G.objs.every(o => o.dead || o.kind === 'bomb')) { challengeEnd(); return; }
+    if (G.time >= CHAL_TIME && (G.chalClock || 0) >= CHAL_TIME && !G.pending.length && G.objs.every(o => o.dead || o.kind === 'bomb')) { challengeEnd(); return; }
   }
   if (G.clearT > 0) { G.clearT -= rdt; if (G.clearT <= 0) { stageClear(); return; } }
   if (G.fin) { updateFinisher(G.fin, rdt); if (G.fin.t >= G.fin.dur) { G.fin = null; finishBoss(); } }
@@ -2311,15 +2329,19 @@ function update(rdt) {
   // 生成
   if (!G.boss && !G.done && G.score >= G.nextBoss) spawnBoss();
   if (G.warnT > 0) G.warnT -= rdt;
-  G.spawnT -= dt;
-  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.chal && G.time >= CHAL_TIME)) {
+  // 挑戰賽的出現節奏跟著真實時間走（60 秒倒數也是真實時間），不受慢動作影響
+  const sdt = G.chal ? rdt : dt;
+  G.spawnT -= sdt;
+  // 挑戰賽用「排定的出場時間」(chalClock) 算難度和截止，不看實際畫面時間，雙方手機快慢不同也會出一樣多顆
+  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.chal && (G.chalClock || 0) >= CHAL_TIME)) {
     // 難度慢慢上升（400 分才到最難）；一次最多 3 顆，最後一關最多 4 顆，而且一顆一顆錯開飛出來
-    const diff = G.chal ? Math.min(1, G.time / 45) : Math.min(1, G.score / 400);
+    const diff = G.chal ? Math.min(1, (G.chalClock || 0) / 45) : Math.min(1, G.score / 400);
     G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1);
+    if (G.chal) G.chalClock = (G.chalClock || 0) + G.spawnT;
     const n = 1 + Math.floor(R() * (1 + diff * 2 + (G.st.diff - 1)));
     for (let i = 0; i < n; i++) G.pending.push({ t: i * 0.28, kind: pickKind(diff) });
   }
-  for (const p of G.pending) { p.t -= dt; if (p.t <= 0) { launch(p.kind); p.done = true; } }
+  for (const p of G.pending) { p.t -= sdt; if (p.t <= 0) { launch(p.kind); p.done = true; } }
   G.pending = G.pending.filter(p => !p.done);
 
   // 物件
@@ -3652,6 +3674,8 @@ async function findProfiles(codes) {
   return out;
 }
 const bladeIconOf = id => (BLADES.find(b => b.id === id) || BLADES[0]).icon;
+// 別人的暱稱、稱號是從雲端讀來的，放進畫面前要先轉成純文字，避免被塞進網頁程式
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const todayKey = () => todayStr();
 
 // ----- 好友頁 -----
@@ -3685,8 +3709,8 @@ function renderFriends() {
   for (const code of codes) {
     const p = friendsCache[code], card = document.createElement('div'), sentToday = save.giftSent && save.giftSent[code] === todayKey();
     card.className = 'fcard';
-    card.innerHTML = `<div class="fn">${p ? bladeIconOf(p.blade) + ' ' + p.name : '❓ ' + code}</div>
-      <div class="fi">${p ? (p.title ? p.title + '・' : '') + '最高 ' + p.best + '・通關 ' + p.cleared : '找不到這個好友碼'}</div>`;
+    card.innerHTML = `<div class="fn">${p ? bladeIconOf(p.blade) + ' ' + esc(p.name) : '❓ ' + esc(code)}</div>
+      <div class="fi">${p ? (p.title ? esc(p.title) + '・' : '') + '最高 ' + esc(p.best) + '・通關 ' + esc(p.cleared) : '找不到這個好友碼'}</div>`;
     const row = document.createElement('div'); row.className = 'frow';
     const mk = (label, cls, dis, fn) => { const b = document.createElement('button'); b.className = 'btn small ' + cls; b.textContent = label; b.disabled = dis; b.onclick = () => { audio(); fn(); }; row.appendChild(b); };
     mk(sentToday ? '🎁 已送' : '🎁 送禮', '', sentToday || !p, () => sendGift(code));
@@ -3773,8 +3797,8 @@ async function challengeEnd() {
     }
   } catch (e) { txt = '⚠️ 結果上傳失敗，請檢查網路'; }
   $('chal-text').textContent = txt;
-  if (save.best < score) save.best = score;
-  persist(); publishProfile();
+  persist(); publishProfile(); // 挑戰賽不扣愛心，分數不算進最高分
+
 }
 
 // ----- 排行榜：總分、無盡模式、通關數；全部玩家或只看好友 -----
@@ -3800,7 +3824,7 @@ async function renderRank() {
     list.innerHTML = '';
     top.forEach((p, i) => {
       const row = document.createElement('div'); row.className = 'rrow' + (p.code === me ? ' me' : '');
-      row.innerHTML = `<span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rn">${bladeIconOf(p.blade)} ${p.name}${p.title ? ' <small>' + p.title + '</small>' : ''}</span><span class="rv">${p[rankTab] || 0}</span>`;
+      row.innerHTML = `<span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rn">${bladeIconOf(p.blade)} ${esc(p.name)}${p.title ? ' <small>' + esc(p.title) + '</small>' : ''}</span><span class="rv">${esc(p[rankTab] || 0)}</span>`;
       list.appendChild(row);
     });
     $('rank-me').textContent = myIdx >= 10 ? `你的名次：第 ${myIdx + 1} 名` : myIdx < 0 ? '打完一局就會出現在排行榜上' : '';
@@ -3816,6 +3840,16 @@ $('btn-rank').onclick = () => { audio(); openRank(); };
 $('btn-rank-back').onclick = () => goMenu();
 $('btn-chal-back').onclick = () => openFriends();
 $('btn-settings-cloud').onclick = () => { audio(); openCloud('menu'); };
+
+// ===== Android 返回鍵：遊戲中＝暫停，其他頁面＝按該頁的返回按鈕，主選單＝離開遊戲 =====
+const BACK_BTN = { paused: 'btn-resume', shop: 'btn-shop-back', stages: 'btn-stages-back', settings: 'btn-settings-back', cloud: 'btn-cloud-back',
+  checkin: 'btn-checkin-back', missions: 'btn-missions-back', ach: 'btn-ach-back', friends: 'btn-friends-back', rank: 'btn-rank-back',
+  chalres: 'btn-chal-back', over: 'btn-over-menu', clear: 'btn-clear-menu', whatsnew: 'btn-wn-ok' };
+if (NATIVE.App) NATIVE.App.addListener('backButton', () => {
+  if (state === 'play') return pauseGame();
+  if (state === 'menu') { persist(); cloudSync(); return NATIVE.App.exitApp(); }
+  const id = BACK_BTN[state]; if (id) $(id).click();
+});
 </script>
 </body>
 </html>
