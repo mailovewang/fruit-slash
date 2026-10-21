@@ -55,7 +55,7 @@
     <h2 style="font-size:17px;margin:24px 0 8px">🎉 活動開關</h2>
     <p id="evmsg" style="color:var(--muted);font-size:13px;margin:0 0 8px"></p>
     <div class="bar">
-      <select id="ev-id" style="font:inherit;padding:8px;border-radius:10px;background:var(--panel);color:var(--text);border:1px solid var(--line)"><option value="halloween">🎃 萬聖節</option></select>
+      <select id="ev-id" style="font:inherit;padding:8px;border-radius:10px;background:var(--panel);color:var(--text);border:1px solid var(--line)"><option value="halloween">🎃 萬聖節</option><option value="christmas">🎄 聖誕節</option></select>
       從 <input type="date" id="ev-from" style="width:auto"> 到 <input type="date" id="ev-to" style="width:auto">
       <button id="ev-on">強制開啟這段時間</button>
       <button id="ev-off" class="ghost">強制關閉</button>
@@ -130,7 +130,7 @@ if (!cfg || !cfg.apiKey) {
       const s = r.stats || {}, t = r.updatedAt ? r.updatedAt.toDate().toLocaleString('zh-TW', { hour12: false }) : '—';
       const tr = document.createElement('tr');
       // 遊玩狀況：從玩家存檔裡的統計拿（局數、切了幾顆水果、打倒幾隻 Boss、簽到天數、帶哪隻寵物）
-      const sv = r.save || {}, st = sv.stats || {}, pets = { cat: '🐱', dog: '🐶', chick: '🐥', bunny: '🐰', panda: '🐼' };
+      const sv = r.save || {}, st = sv.stats || {}, pets = { cat: '🐱', dog: '🐶', chick: '🐥', bunny: '🐰', panda: '🐼', fox: '🦊', dragon: '🐲' };
       const cells = [r.name || '（無暱稱）', r.code, s.coins ?? '—', s.best ?? '—', `${s.cleared ?? 0} / 10`, st.game ?? 0, st.fruit ?? 0, st.boss ?? 0,
         sv.checkin ? sv.checkin.days : 0, sv.pet ? (pets[sv.pet] || sv.pet) : '—', r.version || '—', t];
       cells.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 1) td.className = 'code'; if ((i >= 2 && i <= 3) || (i >= 5 && i <= 8)) td.className = 'num'; tr.appendChild(td); });
@@ -156,7 +156,7 @@ if (!cfg || !cfg.apiKey) {
   async function loadEvent() {
     try {
       const s = await getDoc(evRef()), d = s.exists() ? s.data() : null;
-      $('evmsg').textContent = !d ? '目前：依日期自動（萬聖節每年 10/25～11/2）' : d.off ? '目前：強制關閉所有活動' : `目前：強制開啟 ${d.id}，${d.from} ～ ${d.to}`;
+      $('evmsg').textContent = !d ? '目前：依日期自動（萬聖節每年 10/25～11/2、聖誕節 12/20～12/31）' : d.off ? '目前：強制關閉所有活動' : `目前：強制開啟 ${d.id}，${d.from} ～ ${d.to}`;
       if (d && d.from) { $('ev-from').value = d.from; $('ev-to').value = d.to; $('ev-id').value = d.id; }
     } catch (e) { $('evmsg').textContent = '活動設定讀取失敗：' + e.message; }
   }

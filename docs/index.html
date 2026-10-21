@@ -253,7 +253,7 @@
   #friend-inbox { display: flex; flex-direction: column; gap: 6px; }
   #friend-inbox .btn { font-size: 13px; padding: 7px 10px; }
   #friend-inbox .stat { margin: 0; font-size: 12px; text-align: left; }
-  #rank .tabs { max-width: 260px; }
+  #rank .tabs { max-width: 330px; }
   #rank-list { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 3px; }
   .rrow { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; background: var(--panel); border-radius: 10px; padding: 3px 12px; font-size: 14px; text-align: left; }
   .rrow.me { border: 2px solid var(--gold); }
@@ -295,7 +295,22 @@
   .stage-head { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .stage-head h2 { margin: 0; }
   @media (orientation: landscape) and (max-height: 600px) { .stage { padding: 6px 4px; } .stage .s-icon { font-size: 24px; } #stages { gap: 8px; } }
-  #btn-endless { min-width: 0; padding: 7px 16px; font-size: 14px; box-shadow: none; background: linear-gradient(180deg, #7b2cbf, #3c096c); }
+  #share-view { position: fixed; inset: 0; z-index: 50; background: rgba(10,4,14,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; }
+  #share-view img { max-width: min(92vw, 520px); max-height: 72vh; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.6); user-select: auto; -webkit-user-select: auto; -webkit-touch-callout: default; touch-action: auto; }
+  #share-view p { margin: 0; color: var(--muted); font-size: 14px; }
+  /* 主選單左下角的寵物 */
+  #menu-pet { position: fixed; left: calc(env(safe-area-inset-left) + 14px); bottom: calc(env(safe-area-inset-bottom) + 10px); border: none; background: none;
+    display: flex; flex-direction: column; align-items: center; cursor: pointer; animation: petbob 1.4s ease-in-out infinite; padding: 0; color: #fff; font: inherit; }
+  #menu-pet .mp-icon { font-size: 52px; line-height: 1; filter: drop-shadow(0 0 10px rgba(255,209,102,.6)); }
+  #menu-pet .mp-name { font-size: 11px; font-weight: 800; color: var(--gold); text-shadow: 0 1px 0 #000; }
+  #menu-pet.jump { animation: petjump .5s ease-out; }
+  @keyframes petbob { 50% { transform: translateY(-6px); } }
+  @keyframes petjump { 30% { transform: translateY(-28px) scale(1.15) rotate(-8deg); } 60% { transform: translateY(0) scale(.95); } }
+  #menu-pet-talk { position: fixed; left: calc(env(safe-area-inset-left) + 74px); bottom: calc(env(safe-area-inset-bottom) + 58px); background: #fff; color: #4a2a00;
+    font-weight: 800; font-size: 14px; padding: 6px 12px; border-radius: 14px 14px 14px 2px; box-shadow: 0 4px 12px rgba(0,0,0,.35); pointer-events: none; }
+  @media (orientation: landscape) and (max-height: 600px) { #menu-pet .mp-icon { font-size: 40px; } #menu-pet-talk { bottom: calc(env(safe-area-inset-bottom) + 46px); left: calc(env(safe-area-inset-left) + 62px); } }
+  #btn-endless, #btn-zen { min-width: 0; padding: 7px 16px; font-size: 14px; box-shadow: none; background: linear-gradient(180deg, #7b2cbf, #3c096c); }
+  #btn-zen { background: linear-gradient(180deg, #52b788, #1b4332); }
   @media (orientation: landscape) {
     #mission-list { flex-direction: row; }
     .mission { flex: 1; grid-template-columns: 1fr; text-align: center; }
@@ -309,6 +324,7 @@
 <div id="scroll-hint" class="hidden">⬇ 往下滑還有更多</div>
 <button id="update-bar" class="hidden"></button>
 <div id="toast" class="hidden"></div>
+<div id="share-view" class="hidden"><img id="share-img" alt="成績圖"><p>長按圖片可以儲存，或截圖傳給朋友</p><button class="btn ghost" id="btn-share-close">關閉</button></div>
 
 <div id="loading">
   <h1 class="title">寶貝切切樂</h1>
@@ -344,6 +360,8 @@
   </div>
   <p class="stat hint" style="max-width:300px">滑動手指切水果！不要切到 💣<br>每關打倒 5 隻 Boss 就能解鎖下一關</p>
   <div id="version"></div>
+  <button id="menu-pet" class="hidden" aria-label="寵物"></button>
+  <div id="menu-pet-talk" class="hidden"></div>
 </div>
 
 <div id="nameset" class="screen hidden">
@@ -442,7 +460,7 @@
   <div class="shop-head">
     <button class="btn ghost small" id="btn-rank-back">← 返回</button>
     <h2>🏆 排行榜</h2>
-    <div class="tabs"><button class="tab rtab active" data-r="best">最高分</button><button class="tab rtab" data-r="endless">無盡</button><button class="tab rtab" data-r="cleared">通關</button></div>
+    <div class="tabs"><button class="tab rtab active" data-r="week">本週</button><button class="tab rtab" data-r="best">最高分</button><button class="tab rtab" data-r="endless">無盡</button><button class="tab rtab" data-r="cleared">通關</button></div>
     <div class="tabs"><button class="tab rtab active" data-s="all">全部</button><button class="tab rtab" data-s="friends">好友</button></div>
   </div>
   <div id="rank-list"></div>
@@ -457,7 +475,7 @@
 </div>
 
 <div id="stages" class="screen hidden">
-  <div class="stage-head"><h2>選擇關卡</h2><button class="btn" id="btn-endless">♾️ 無盡模式</button></div>
+  <div class="stage-head"><h2>選擇關卡</h2><button class="btn" id="btn-endless">♾️ 無盡模式</button><button class="btn" id="btn-zen">🧘 禪模式</button></div>
   <div id="stage-list"></div>
   <button class="btn ghost" id="btn-stages-back">返回</button>
 </div>
@@ -470,6 +488,7 @@
   <div id="clear-unlock" class="badge hidden"></div>
   <div class="btn-row">
   <button class="btn" id="btn-next">下一關 ▶</button>
+  <button class="btn alt" id="btn-share-clear">📤 分享成績</button>
   <button class="btn alt" id="btn-clear-shop">🛒 商店</button>
   <button class="btn ghost" id="btn-clear-menu">主選單</button>
   </div>
@@ -495,12 +514,13 @@
 </div>
 
 <div id="over" class="screen hidden">
-  <h1 class="title">遊戲結束</h1>
+  <h1 class="title" id="over-title">遊戲結束</h1>
   <div class="big-score" id="over-score">0</div>
   <div id="over-record" class="badge hidden">新紀錄！</div>
   <p class="stat">最高分 <b id="over-best">0</b>　本局金幣 <b id="over-coins">0</b></p>
   <div class="btn-row">
   <button class="btn" id="btn-again">再玩一次</button>
+  <button class="btn alt" id="btn-share-over">📤 分享成績</button>
   <button class="btn alt" id="btn-over-shop">🛒 商店</button>
   <button class="btn ghost" id="btn-over-menu">主選單</button>
   </div>
@@ -662,9 +682,19 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '2.0.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '2.1.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '2.1.0': [
+    '🍌 新增特殊香蕉：冰凍（時間變慢）、狂熱（分數 ×2、水果變多）、金幣（金幣 ×2）',
+    '🔥 一刀連斬 5 顆會有慢動作；刀劃過水果正中間是「完美切」，多加 1 分',
+    '🔊 每種水果切起來聲音都不一樣：西瓜低沉、蘋果脆脆的、椰子硬硬的、草莓清脆',
+    '🧘 新增禪模式：90 秒、沒有炸彈、不會輸，慢慢切最放鬆',
+    '🏆 新增本週排行榜：每週一重新計算，上週前三名送金幣',
+    '📤 結算畫面可以分享成績圖給朋友',
+    '🦊 新寵物：小狐狸（連斬金幣更多）、小龍寶寶（會噴火燒掉一整排）；主選單會看到你的寵物，點牠會說話',
+    '🎄 聖誕節活動（12/20～12/31）準備好了：切禮物拿聖誕刀光',
+  ],
   '2.0.1': [
     '🐾 寵物有特效了：貓咪會撲過去抓水果、兔兔會跳過去接住、貓熊的大熊掌從天上拍向 Boss、狗狗會噴金幣、小雞會開心跳',
     '✨ 寵物身邊有光環，等級越高越亮；滿級還會一直閃閃發亮',
@@ -1195,6 +1225,13 @@ function tone(f1, f2, dur, vol, type = 'sine', delay = 0) {
   o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur);
 }
 let lastSliceSfx = 0, lastSwingSfx = 0;
+const SLICE_SOUND = {
+  default: { p: 1, th: 1, sq: 1 },
+  watermelon: { p: 0.62, th: 1.6, sq: 1.25 }, pumpkin: { p: 0.6, th: 1.5, sq: 0.8 }, coconut: { p: 0.75, th: 1.2, sq: 0.5, hard: true },
+  apple: { p: 1.05, th: 0.9, sq: 0.8, crunch: true }, orange: { p: 0.95, th: 1, sq: 1.35 }, lemon: { p: 1.05, th: 0.9, sq: 1.3 },
+  peach: { p: 0.9, th: 1.05, sq: 1.15 }, strawberry: { p: 1.35, th: 0.6, sq: 1 }, kiwi: { p: 1.2, th: 0.8, sq: 1.1 }, plum: { p: 1.15, th: 0.8, sq: 1.1 },
+  banana: { p: 0.95, th: 0.8, sq: 0.7 }, star: { bling: true }, heart: { bling: true },
+};
 // 雜訊＋會滑動的濾波器（頻率從 f0 滑到 f1），用來做刀聲、切開聲、風聲
 function sweepNoise(dur, f0, f1, q, vol, type = 'bandpass', delay = 0) {
   const t = actx.currentTime + delay, f = actx.createBiquadFilter();
@@ -1206,14 +1243,18 @@ function sweepNoise(dur, f0, f1, q, vol, type = 'bandpass', delay = 0) {
 }
 const sfx = {
   // 切開水果：刀刃擦過的「唰」＋多汁的「啾」（濾波器往下滑的雜訊）＋悶悶的果肉「噗」＋幾滴果汁「滴」
-  slice() {
+  // 每種水果的聲音不一樣：p 音高、th 果肉悶響、sq 多汁程度、hard 硬殼「叩」、crunch 脆脆的、bling 亮晶晶（金星、愛心）
+  slice(id) {
     const n = performance.now(); if (n - lastSliceSfx < 45) return; lastSliceSfx = n;
     if (!actx || !settings().sfx) return;
-    const p = 0.85 + Math.random() * 0.3; // 每次音高稍微不同，連續切才不會像機關槍
+    const pr = SLICE_SOUND[id] || SLICE_SOUND.default, p = pr.p * (0.92 + Math.random() * 0.16); // 每次音高稍微不同，連續切才不會像機關槍
     sweepNoise(0.035, 6000, 4000, 0.7, 0.10, 'highpass');
-    sweepNoise(0.11, 1900 * p, 420 * p, 1.6, 0.42, 'bandpass', 0.01);
-    tone(170 * p, 60, 0.09, 0.22, 'sine', 0.01);
-    for (let i = 0; i < 2; i++) tone(1100 + Math.random() * 600, 1800 + Math.random() * 500, 0.03, 0.025, 'sine', 0.05 + Math.random() * 0.09);
+    if (pr.bling) { [1320, 1760, 2640].forEach((f, i) => tone(f, f * 1.02, 0.12, 0.05, 'triangle', i * 0.04)); return; }
+    sweepNoise(0.11 * (pr.th > 1.2 ? 1.3 : 1), 1900 * p, 420 * p, 1.6, 0.42 * pr.sq, 'bandpass', 0.01);
+    tone(170 * p, 60 * p, 0.09 * pr.th, 0.22 * pr.th, 'sine', 0.01);
+    if (pr.hard) tone(950, 620, 0.025, 0.09, 'square', 0.005);
+    if (pr.crunch) sweepNoise(0.06, 4200, 2400, 2.5, 0.16, 'bandpass', 0.005);
+    for (let i = 0; i < (pr.sq > 1.1 ? 3 : 2); i++) tone(1100 * p + Math.random() * 600, 1800 + Math.random() * 500, 0.03, 0.025, 'sine', 0.05 + Math.random() * 0.09);
   },
   // 用力揮刀（沒切到也有）：風聲「咻」，揮越快越大聲
   swing(speed) {
@@ -1289,7 +1330,7 @@ function newGame(stage) {
   G = { stage, st, score: 0, hearts: START_HEARTS + perkLvl('life'), coinsEarned: 0, coinFrac: 0, objs: [], pending: [], pieces: [], parts: [], splats: [],
     rings: [], bolts: [], texts: [], homers: [], slashes: [], beams: [], spawnT: 0.8, time: 0, timeScale: 1, slowT: 0,
     shake: 0, flash: 0, flashColor: '#fff', boss: null, bossIndex: 0, nextBoss: BOSS_AT[0], warnT: 0, overT: 0,
-    strokeCount: 0, trail: [], clouds: [], pillars: [], shield: 0, freezeT: 0, fin: null, bfx: null, clearT: 0, done: false, ev: activeEvent(), pet: petForGame(),
+    strokeCount: 0, trail: [], clouds: [], pillars: [], shield: 0, freezeT: 0, fin: null, bfx: null, clearT: 0, done: false, ev: activeEvent(), pet: petForGame(), buff: { frenzy: 0, coin: 0 },
     tut: save.tutorialDone ? null : { t: 0, cut: false, bomb: false, miss: false, msg: '', msgT: 0 } };
   initBG(st.bg);
 }
@@ -1307,11 +1348,13 @@ function launch(kind, opts) {
     let f = FRUITS[R() * FRUITS.length | 0];
     // 活動期間有些水果會換成活動水果（用 Math.random，不影響挑戰賽的固定順序；挑戰賽本來就沒有活動）
     if (G.ev && Math.random() < G.ev.rate) { f = G.ev.fruit; o.ev = true; }
-    o.f = f; o.art = f.id; o.r = r * (f.s || 1);
+    o.f = f; o.r = r * (f.s || 1);
+    if (f.e) o.e = f.e; else o.art = f.id; // 聖誕禮物盒這種用表情符號畫，水果用程式畫
   }
   else if (kind === 'bomb') { o.art = 'bomb'; o.r = r * 0.95; }
   else if (kind === 'star') { o.e = '🌟'; o.r = r * 0.85; }
   else if (kind === 'heart') { o.e = '💗'; o.r = r * 0.85; }
+  else if (kind === 'banana') { o.e = '🍌'; o.r = r * 0.95; o.bt = ['freeze', 'frenzy', 'coin'][Math.random() * 3 | 0]; }
   Object.assign(o, opts);
   G.objs.push(o);
   return o;
@@ -1320,14 +1363,17 @@ function pickKind(diff) {
   // 挑戰賽不算強化等級、也不看目前愛心數，雙方出現的東西才會完全一樣
   const pl = id => (G.chal ? 0 : perkLvl(id));
   // 新手教學第一步（還沒切到第一顆水果）不出炸彈
-  const r = R(), bomb = G.tut && !G.tut.cut ? 0 : (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
+  // 禪模式沒有炸彈
+  const r = R(), bomb = (G.tut && !G.tut.cut) || G.zen ? 0 : (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
   const chick = G.pet && G.pet.id === 'chick' ? G.pet.lvl : 0; // 小雞：金星、愛心更常出現
   const star = 0.03 + 0.012 * pl('star') + 0.01 * chick, heart = 0.015 + 0.01 * pl('heart') + 0.005 * chick;
   // 小雞帶來的金星、愛心：小雞開心跳一下、灑羽毛
   const chickFx = () => { if (!chick) return; const pp = petPos(); petAct('happy'); text(pp.x + S * 0.05, pp.y - S * 0.1, '嗶！', '#fff3a0', 0.045, 0.7); emojiBurst(pp.x, pp.y, '✨', 3, S * 0.025, 0.3); };
   if (r < bomb) return 'bomb';
   if (r < bomb + star) { chickFx(); return 'star'; }
-  if (r < bomb + star + heart && (G.chal || G.hearts < MAX_HEARTS)) { chickFx(); return 'heart'; }
+  if (r < bomb + star + heart && (G.chal || G.hearts < MAX_HEARTS) && !G.zen) { chickFx(); return 'heart'; }
+  // 特殊香蕉 3%（挑戰賽沒有，維持雙方水果順序一樣；禪模式更常出現）
+  if (!G.chal && r < bomb + star + heart + (G.zen ? 0.06 : 0.03)) return 'banana';
   return 'fruit';
 }
 
@@ -1410,10 +1456,10 @@ function makeHalves(o, ang, off = 0, col = '#fff', force = 1) {
 
 function addCoins(n) {
   const dog = G.pet && G.pet.id === 'dog' ? 0.1 + 0.05 * G.pet.lvl : 0; // 小狗狗：金幣加成
-  const v = n * (1 + 0.08 * perkLvl('coin') + dog) + G.coinFrac, w = Math.floor(v + 1e-9);
+  const v = n * (1 + 0.08 * perkLvl('coin') + dog) * (G.buff && G.buff.coin > 0 ? 2 : 1) + G.coinFrac, w = Math.floor(v + 1e-9);
   G.coinFrac = v - w; save.coins += w; G.coinsEarned += w;
   // 小狗狗幫忙多賺的金幣：從牠身上跳出一枚金幣（不要太頻繁）
-  if (dog && w > 0 && G.time - (G.pet.coinFx || -9) > 0.6) {
+  if (dog && w > 0 && (G.pet.coinFx === undefined || G.time - G.pet.coinFx > 0.6)) {
     G.pet.coinFx = G.time; const pp = petPos(); petAct('happy');
     addPart({ x: pp.x, y: pp.y - S * 0.05, vx: (Math.random() - 0.5) * S * 0.2, vy: -S * 0.6, life: 0.8, max: 0.8, e: '🪙', size: S * 0.03, g: 0.8, rot: 0 });
   }
@@ -1425,21 +1471,65 @@ function hitObj(o, ang, byEffect, off = 0) {
   if (o.dead) return;
   if (o.kind === 'bomb') { if (!byEffect && !G.fin) explodeBomb(o); return; }
   o.dead = true;
-  const col = o.f ? o.f.c : o.kind === 'heart' ? '#ff5c8a' : '#ffd166';
+  const col = o.f ? o.f.c : o.kind === 'heart' ? '#ff5c8a' : o.kind === 'banana' ? '#ffe14d' : '#ffd166';
   makeHalves(o, ang, off, col);
   juice(o.x, o.y, col);
   splat(o.x, o.y, col, o.r);
-  G.score += 1;
+  const mul = scoreMul();
+  G.score += mul;
   addCoins(coinMult());
   if (o.kind === 'fruit') track('fruit');
   if (o.ev && G.ev) eventProgress(G.ev);
   if (G.tut && !G.tut.cut && !byEffect) { G.tut.cut = true; tutSay('👍 很好！就是這樣切', 1.6); }
-  if (!byEffect) G.strokeCount++; // 連斬只算手指真的劃到的，刀的特效連鎖不算
+  if (!byEffect) {
+    G.strokeCount++; // 連斬只算手指真的劃到的，刀的特效連鎖不算
+    if (o.kind === 'fruit' && Math.abs(off) < o.r * 0.18) perfectCut(o, mul); // 劃過正中間
+    if (G.strokeCount === 5 && !G.comboSlow) comboSlow(o);                  // 一刀 5 顆：慢動作
+  }
   if (o.kind === 'star') { track('star'); const c = addCoins(5 * coinMult()); text(o.x, o.y, `+${c} 💰`, '#ffd166'); sfx.coin(); }
   if (o.kind === 'heart') { G.hearts = Math.min(MAX_HEARTS, G.hearts + 1); text(o.x, o.y, '+❤️', '#ff5c8a'); sfx.coin(); }
-  sfx.slice();
+  if (o.kind === 'banana') useBanana(o);
+  sfx.slice(o.f ? o.f.id : o.kind);
   if (!byEffect) bladeEffect(o, ang);
   updateHUD();
+}
+// 狂熱香蕉期間分數 ×2
+const scoreMul = () => (G.buff && G.buff.frenzy > 0 ? 2 : 1);
+// 完美切：刀正好劃過水果中心，多 1 分、白色閃光
+function perfectCut(o, mul) {
+  if (G.lastPerfect !== undefined && G.time - G.lastPerfect < 0.25) return;
+  G.lastPerfect = G.time; G.score += mul;
+  ring(o.x, o.y, o.r * 1.6, '#ffffff', 0.3, 0.015); juice(o.x, o.y, '#ffffff', 6, 1.4);
+  text(o.x, o.y - o.r * 1.1, '完美！+' + mul, '#ffffff', 0.05, 0.7);
+}
+// 一刀連斬 5 顆：畫面變慢一下、金色閃光（每一刀只觸發一次）
+function comboSlow(o) {
+  G.comboSlow = true; G.slowT = Math.max(G.slowT, 0.7);
+  G.flash = 0.12; G.flashColor = '#ffd166'; ring(o.x, o.y, S * 0.3, '#ffd166', 0.5, 0.025);
+  text(W / 2, H * 0.36, '🔥 連斬！', '#ffd166', 0.09, 1);
+  tone(500, 1000, 0.25, 0.08, 'triangle'); buzz(25);
+}
+// ===== 特殊香蕉：冰凍（時間變慢）、狂熱（分數 ×2、水果變多）、金幣（金幣 ×2） =====
+const BANANAS = {
+  freeze: { glow: '#7fd3ff', label: '❄️ 冰凍香蕉：時間變慢！', color: '#a8e6ff' },
+  frenzy: { glow: '#ff4d6d', label: '🔥 狂熱香蕉：分數 ×2、水果變多！', color: '#ff8fa3' },
+  coin: { glow: '#ffd166', label: '💰 金幣香蕉：金幣 ×2！', color: '#ffd166' },
+};
+function useBanana(o) {
+  const b = BANANAS[o.bt]; if (!b) return;
+  if (o.bt === 'freeze') { G.slowT = Math.max(G.slowT, 4); sfx.freeze(); }
+  else { G.buff[o.bt] = 6; sfx.win(); }
+  text(W / 2, H * 0.42, b.label, b.color, 0.06, 1.6); ring(o.x, o.y, S * 0.25, b.glow, 0.5, 0.03);
+}
+function drawBuffs() {
+  const parts = [];
+  if (G.buff.frenzy > 0) parts.push(`🔥 分數×2（${Math.ceil(G.buff.frenzy)}秒）`);
+  if (G.buff.coin > 0) parts.push(`💰 金幣×2（${Math.ceil(G.buff.coin)}秒）`);
+  if (G.zen) parts.unshift(`🧘 剩 ${Math.max(0, Math.ceil(ZEN_TIME - G.time))} 秒`);
+  if (!parts.length) return;
+  ctx.save(); ctx.font = `800 ${S * 0.04}px ${FONT},${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = S * 0.008; ctx.strokeStyle = 'rgba(0,0,0,.7)'; const s = parts.join('　'), y = H * 0.12 + (G.boss ? S * 0.08 : 0);
+  ctx.strokeText(s, W / 2, y); ctx.fillStyle = '#fff'; ctx.fillText(s, W / 2, y); ctx.restore();
 }
 
 function nearestFruit(x, y, maxD = Infinity) {
@@ -1606,7 +1696,7 @@ function updateZones(dt, rdt) {
 }
 
 function loseHeart() {
-  if (G.overT > 0 || G.done || G.chal) return;
+  if (G.overT > 0 || G.done || G.chal || G.zen) return; // 挑戰賽、禪模式不扣愛心
   // 聖光刀的護盾：抵擋一次
   if (G.shield > 0) { G.shield--; text(W / 2, H * 0.5, '🛡️ 護盾抵擋！', '#fff3b0', 0.08, 1); ring(W / 2, H * 0.5, S * 0.3, '#ffd166', 0.5); updateHUD(); return; }
   G.hearts--;
@@ -2311,6 +2401,7 @@ function drawStageBGLayer(now) {
   const dt = BG.last ? Math.min(0.05, (now - BG.last) / 1000) : 0; BG.last = now;
   BGDRAW[BG.type](now / 1000, dt);
   if (G && G.ev && G.ev.id === 'halloween') drawHalloween(now / 1000);
+  if (G && G.ev && G.ev.id === 'christmas') drawChristmas(now / 1000);
   // 暗角：讓水果和文字比較清楚（畫在 1/4 大小的小圖上存起來，每格放大貼上，不用每格重算漸層）
   if (!vignette.c || vignette.w !== W || vignette.h !== H) {
     const c = vignette.c || document.createElement('canvas'), q = 4, g = c.getContext('2d');
@@ -2332,6 +2423,23 @@ function drawHalloween(t) {
     const x = u * W, y = H * (0.12 + 0.07 * i) + Math.sin(t * 2 + i * 1.7) * S * 0.03;
     drawSprite('🦇', S * (0.035 + (i % 3) * 0.008), x, y, Math.sin(t * 6 + i) * 0.2, 0.8);
   }
+}
+// 聖誕節：冷冷的藍色夜晚、一直飄的雪、兩邊的聖誕樹和一串彩色小燈
+function drawChristmas(t) {
+  ctx.fillStyle = vgrad(0, H, [[0, 'rgba(10,30,80,0.6)'], [0.6, 'rgba(40,70,140,0.25)'], [1, 'rgba(255,255,255,0.18)']]); ctx.fillRect(0, 0, W, H);
+  // 彩色小燈：一條垂下來的弧線
+  for (let i = 0; i <= 16; i++) {
+    const u = i / 16, x = u * W, y = H * 0.05 + Math.sin(u * Math.PI) * H * 0.06, on = (Math.floor(t * 3) + i) % 2;
+    ctx.globalAlpha = on ? 0.95 : 0.4; ctx.fillStyle = ['#ff4d6d', '#ffd166', '#80ed99', '#a0c4ff'][i % 4]; circle(x, y, S * 0.008);
+  }
+  ctx.globalAlpha = 1;
+  drawSprite('🎄', S * 0.16, W * 0.2, H * 0.84); drawSprite('🎄', S * 0.13, W * 0.95, H * 0.86); // 左下角留給寵物
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 50; i++) {
+    const sp = 0.03 + (i % 5) * 0.012, y = ((t * sp + i * 0.137) % 1.1) - 0.05, x = ((i * 0.618) % 1) + Math.sin(t * 0.8 + i) * 0.02;
+    ctx.globalAlpha = 0.5 + (i % 3) * 0.2; circle(x * W, y * H, S * (0.003 + (i % 4) * 0.0015));
+  }
+  ctx.globalAlpha = 1;
 }
 // 發光粒子（火焰、毒霧、影子）：每種顏色先畫一張漸層光點存起來，之後直接縮放貼上
 const glowCache = new Map();
@@ -2522,6 +2630,8 @@ function drawBossFx(fx, now) {
 function update(rdt) {
   G.time += rdt;
   tutTick(rdt);
+  G.buff.frenzy = Math.max(0, G.buff.frenzy - rdt); G.buff.coin = Math.max(0, G.buff.coin - rdt);
+  if (G.zen && G.time >= ZEN_TIME && G.overT <= 0 && !G.objs.some(o => !o.dead && o.kind === 'fruit')) { zenEnd(); return; }
   G.slowT -= rdt;
   G.freezeT -= rdt;
   const target = G.fin ? 0.22 : G.freezeT > 0 ? 0.03 : G.slowT > 0 ? 0.4 : 1;
@@ -2544,10 +2654,10 @@ function update(rdt) {
   const sdt = G.chal ? rdt : dt;
   G.spawnT -= sdt;
   // 挑戰賽用「排定的出場時間」(chalClock) 算難度和截止，不看實際畫面時間，雙方手機快慢不同也會出一樣多顆
-  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.chal && (G.chalClock || 0) >= CHAL_TIME)) {
-    // 難度慢慢上升（400 分才到最難）；一次最多 3 顆，最後一關最多 4 顆，而且一顆一顆錯開飛出來
-    const diff = G.chal ? Math.min(1, (G.chalClock || 0) / 45) : Math.min(1, G.score / 400);
-    G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1);
+  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.chal && (G.chalClock || 0) >= CHAL_TIME) && !(G.zen && G.time >= ZEN_TIME)) {
+    // 難度慢慢上升（400 分才到最難；禪模式照時間）；一次最多 3 顆，最後一關最多 4 顆，而且一顆一顆錯開飛出來
+    const diff = G.chal ? Math.min(1, (G.chalClock || 0) / 45) : G.zen ? Math.min(1, G.time / 60) : Math.min(1, G.score / 400);
+    G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1) * (G.buff.frenzy > 0 ? 0.45 : 1) * (G.zen ? 0.8 : 1);
     if (G.chal) G.chalClock = (G.chalClock || 0) + G.spawnT;
     const n = 1 + Math.floor(R() * (1 + diff * 2 + (G.st.diff - 1)));
     for (let i = 0; i < n; i++) G.pending.push({ t: i * 0.28, kind: pickKind(diff) });
@@ -2871,6 +2981,11 @@ function render(now) {
       ctx.beginPath(); ctx.arc(o.x, o.y, o.r * (1.2 + Math.sin(now / 120) * 0.1), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     }
     if (o.kind === 'bomb') { ctx.globalAlpha = 0.35; ctx.fillStyle = '#ff2e2e'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r * 1.15, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+    if (o.kind === 'banana') { // 香蕉：依種類發不同顏色的光
+      const gr = o.r * (1.5 + Math.sin(now / 110) * 0.12);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.75;
+      ctx.drawImage(glowSprite(BANANAS[o.bt].glow, 'rgba(0,0,0,0)'), o.x - gr, o.y - gr, gr * 2, gr * 2); ctx.restore();
+    }
     if (o.art) drawArt('s', o.art, o.r, o.x, o.y, o.rot);
     else drawSprite(o.e, o.r * 2, o.x, o.y, o.rot);
   }
@@ -2971,6 +3086,7 @@ function render(now) {
 
   if (f) drawFinisherOver(f, now);
   drawTutorial();
+  drawBuffs();
   if (G.warnT > 0 && G.boss) {
     const a = Math.min(1, G.warnT) * (0.6 + 0.4 * Math.sin(now / 80));
     ctx.globalAlpha = a * 0.55; ctx.fillStyle = '#c1121f'; ctx.fillRect(0, H * 0.5 - S * 0.09, W, S * 0.18);
@@ -3082,7 +3198,7 @@ cv.addEventListener('pointerdown', e => {
   activePointer = e.pointerId;
   lastPt = { x: e.clientX, y: e.clientY, t: e.timeStamp };
   G.trail = [{ x: lastPt.x, y: lastPt.y, t: performance.now() }];
-  G.strokeCount = 0;
+  G.strokeCount = 0; G.comboSlow = false;
 });
 cv.addEventListener('pointermove', e => {
   if (state !== 'play' || e.pointerId !== activePointer) return;
@@ -3100,12 +3216,15 @@ function endStroke(e) {
   activePointer = null;
   if (state === 'play' && G.strokeCount >= 3) {
     const n = G.strokeCount;
-    G.score += n; addCoins(Math.floor(n / 2) * coinMult());
+    // 小狐狸：連斬金幣加成，還會開心跳一下
+    const fox = G.pet && G.pet.id === 'fox' ? 1.2 + 0.15 * G.pet.lvl : 1;
+    if (fox > 1) { petAct('happy'); const pp = petPos(); text(pp.x + S * 0.06, pp.y - S * 0.1, '嘿嘿！', '#ff9f1c', 0.045, 0.7); }
+    G.score += n; addCoins(Math.floor(n / 2) * coinMult() * fox);
     text(lastPt.x, lastPt.y - S * 0.05, `${n} 連斬！+${n}`, '#ffd166', 0.075, 1.1);
     track('maxCombo', n); if (n >= 5) track('combo5');
     sfx.coin(); updateHUD();
   }
-  if (G) G.strokeCount = 0;
+  if (G) { G.strokeCount = 0; G.comboSlow = false; }
 }
 cv.addEventListener('pointerup', endStroke);
 cv.addEventListener('pointercancel', endStroke);
@@ -3329,6 +3448,7 @@ function goMenu() {
   const ttl = titleOf(); if (ttl) $('menu-sub').innerHTML += '<span id="menu-title-chip">' + ttl.icon + ' ' + ttl.name + '</span>';
   $('btn-missions').textContent = missionsClaimable() ? '🎯 每日任務 ❗' : '🎯 每日任務';
   $('btn-settings').textContent = needCodeReminder() ? '⚙️ 設定 ❗' : '⚙️ 設定';
+  renderMenuPet();
   const ev = activeEvent();
   $('event-banner').classList.toggle('hidden', !ev);
   if (ev) $('event-banner').textContent = eventBannerText(ev);
@@ -3374,6 +3494,7 @@ function openStages() { state = 'stages'; renderStages(); show('stages'); }
 function renderStages() {
   $('btn-endless').disabled = !save.cleared[0];
   $('btn-endless').textContent = save.cleared[0] ? '♾️ 無盡模式（最佳 ' + stats().endlessBest + ' 隻 Boss）' : '♾️ 無盡模式（通過第 1 關解鎖）';
+  $('btn-zen').textContent = '🧘 禪模式（90 秒・沒有炸彈' + (save.zenBest ? '・最佳 ' + save.zenBest : '') + '）';
   const list = $('stage-list'); list.innerHTML = '';
   STAGES.forEach((st, i) => {
     const locked = i >= save.unlocked;
@@ -3385,11 +3506,13 @@ function renderStages() {
     list.appendChild(bt);
   });
 }
-function startGame(stage) { if (stage === 'endless') return startEndless(); audio(); curStage = stage; newGame(stage); state = 'play'; show(null); track('game'); updateHUD(); }
+function startGame(stage) { if (stage === 'endless') return startEndless(); if (stage === 'zen') return startZen(); audio(); curStage = stage; newGame(stage); state = 'play'; show(null); track('game'); updateHUD(); }
 function pauseGame() { if (state !== 'play') return; state = 'paused'; persist(); show('pause'); }
 function recordScore() {
   if (G.chal) return false;
   if (G.tut && G.tut.cut) { save.tutorialDone = true; G.tut = null; } // 玩完一局就算學會了
+  if (G.zen) { save.zenBest = Math.max(save.zenBest || 0, G.score); return false; } // 禪模式另外計分，不算最高分、不上週榜
+  recordWeek(G.score);
   if (G.endless) { track('endlessBest', G.bossIndex); save.endlessBestScore = Math.max(save.endlessBestScore || 0, G.score); const rec = G.score > save.best; if (rec) save.best = G.score; return rec; }
   save.stageBest[G.stage] = Math.max(save.stageBest[G.stage] || 0, G.score);
   const rec = G.score > save.best;
@@ -3400,6 +3523,8 @@ function gameOver() {
   state = 'over';
   const rec = recordScore();
   persist(); publishProfile();
+  $('over-title').textContent = '遊戲結束';
+  setResult(G.endless ? `♾️ 無盡模式・打倒 ${G.bossIndex} 隻 Boss` : `${G.st.icon} 第 ${G.stage + 1} 關・${G.st.name}`, G.score, save.best);
   $('over-score').textContent = G.score; $('over-best').textContent = save.best; $('over-coins').textContent = G.coinsEarned;
   $('over-record').classList.toggle('hidden', !rec);
   $('boss-bar').classList.add('hidden');
@@ -3417,6 +3542,7 @@ function stageClear() {
   persist();
   $('clear-stage').textContent = `${G.st.icon} ${G.st.name} 完成！` + (firstBonus ? `　首次通關獎勵 +${firstBonus} 💰` : '');
   $('clear-score').textContent = G.score; $('clear-coins').textContent = G.coinsEarned;
+  setResult(`🎉 通過第 ${i + 1} 關・${G.st.name}`, G.score, save.best);
   $('clear-unlock').classList.toggle('hidden', !unlockNew);
   if (unlockNew) $('clear-unlock').textContent = `🔓 解鎖新關卡：${STAGES[i + 1].icon} ${STAGES[i + 1].name}`;
   $('btn-next').classList.toggle('hidden', i + 1 >= STAGES.length);
@@ -3843,6 +3969,7 @@ const TRAILS = [
   { id: 'star', name: '星光刀光', price: 5000, desc: '刀光後面會灑下星星。', colors: ['#ffffff', '#fff3b0', '#a0c4ff'], sparkle: true },
   // 活動限定（不能買，活動獎勵）
   { id: 'pumpkin', name: '南瓜刀光', event: '萬聖節', desc: '萬聖節活動限定：橘紫色的南瓜刀光。', colors: ['#ffd166', '#ff7b00', '#5a189a'] },
+  { id: 'xmas', name: '聖誕刀光', event: '聖誕節', desc: '聖誕節活動限定：紅綠白的聖誕刀光，還會飄雪花。', colors: ['#ffffff', '#e63946', '#2d6a4f'], sparkle: true },
   // 扭蛋限定（不能買，只能從扭蛋抽到）
   { id: 'aurora', name: '極光刀光', gacha: true, desc: '扭蛋限定：綠紫交錯的極光。', colors: ['#ffffff', '#80ffdb', '#7400b8'] },
   { id: 'lava', name: '熔岩刀光', gacha: true, desc: '扭蛋限定：滾燙的熔岩。', colors: ['#fff3b0', '#ff4d00', '#3d0000'] },
@@ -3858,7 +3985,7 @@ function renderTrails(list, det) {
   for (const t of TRAILS) {
     const owned = !!save.trails[t.id], eq = (save.trail || 'default') === t.id, tile = document.createElement('button');
     tile.className = 'tile' + (shopTrailSel.id === t.id ? ' sel' : '') + (eq ? ' eq' : '');
-    tile.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${t.colors.join(',')})"></div><div class="tn">${t.name}</div><div class="ts">${owned ? '已擁有' : t.gacha ? '🎰 扭蛋' : t.event ? '🎃 活動' : '💰' + t.price}</div>${eq ? '<div class="tb">使用中</div>' : ''}`;
+    tile.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${t.colors.join(',')})"></div><div class="tn">${t.name}</div><div class="ts">${owned ? '已擁有' : t.gacha ? '🎰 扭蛋' : t.event ? '🎁 活動' : '💰' + t.price}</div>${eq ? '<div class="tb">使用中</div>' : ''}`;
     tile.onclick = () => { audio(); shopTrailSel.id = t.id; renderShop(); };
     list.appendChild(tile);
   }
@@ -3866,7 +3993,7 @@ function renderTrails(list, det) {
   const card = document.createElement('div'); card.className = 'card';
   card.innerHTML = `<div class="icon">✨</div><div class="name">${t.name}</div><div class="desc">${t.desc}</div><div class="fx"><div class="trail-preview" style="background:linear-gradient(90deg,transparent,${t.colors.join(',')},#fff)"></div></div><div class="actions"></div>`;
   const act = card.querySelector('.actions'), bt = document.createElement('button');
-  if (!owned && (t.gacha || t.event)) { bt.className = 'btn ghost'; bt.textContent = t.gacha ? '🎰 扭蛋限定' : `🎃 ${t.event}活動限定`; bt.disabled = true; }
+  if (!owned && (t.gacha || t.event)) { bt.className = 'btn ghost'; bt.textContent = t.gacha ? '🎰 扭蛋限定' : `🎁 ${t.event}活動限定`; bt.disabled = true; }
   else if (!owned) { bt.className = 'btn'; bt.textContent = `購買 💰${t.price}`; bt.disabled = save.coins < t.price; bt.onclick = () => { audio(); save.coins -= t.price; save.trails[t.id] = true; save.trail = t.id; persist(); sfx.win(); renderShop(); }; }
   else { bt.className = 'btn ' + (eq ? 'ghost' : 'alt'); bt.textContent = eq ? '使用中' : '裝備'; bt.disabled = eq; bt.onclick = () => { audio(); save.trail = t.id; persist(); sfx.coin(); renderShop(); }; }
   act.appendChild(bt); det.appendChild(card);
@@ -3944,7 +4071,15 @@ const PETS = [
   { id: 'chick', icon: '🐥', name: '小雞', price: 4000, desc: l => `金星出現率 +${l}%、補血愛心出現率 +${(l * 0.5).toFixed(1)}%` },
   { id: 'bunny', icon: '🐰', name: '小兔兔', price: 5000, desc: l => `每局 ${l >= 4 ? 2 : 1} 次幫你接住漏掉的水果，不扣愛心` },
   { id: 'panda', icon: '🐼', name: '貓熊', price: 8000, desc: l => `打 Boss 時每 ${(6 - 0.6 * l).toFixed(1)} 秒拍一下，造成 ${1 + 0.5 * l} 傷害` },
+  { id: 'fox', icon: '🦊', name: '小狐狸', price: 6000, desc: l => `連斬（一刀 3 顆以上）得到的金幣 +${20 + 15 * l}%` },
+  { id: 'dragon', icon: '🐲', name: '小龍寶寶', price: 12000, desc: l => `每 ${14 - l} 秒噴一道火焰，燒掉同一排的水果（也會燒到 Boss）` },
 ];
+// 主選單上點寵物時牠會說的話
+const PET_TALK = {
+  cat: ['喵～', '喵嗚！', '摸摸我～', '我要吃小魚乾'], dog: ['汪！', '汪汪！', '一起玩！', '我幫你撿金幣'], chick: ['嗶！', '嗶嗶～', '星星給你！'],
+  bunny: ['蹦蹦！', '我會接住你～', '紅蘿蔔呢？'], panda: ['哈～欠', '竹子好吃', '我來拍 Boss！'], fox: ['嘿嘿', '連斬！連斬！', '金幣是我的～'],
+  dragon: ['嗷～', '噴火！', '我會長大的！'],
+};
 const petLvl = id => (save.pets && save.pets[id]) || 0;
 const feedCost = (p, lvl) => Math.round(p.price * 0.4 * Math.pow(1.6, lvl - 1));
 const shopPetSel = { id: 'cat' };
@@ -3972,10 +4107,10 @@ function renderPets(list, det) {
 }
 const emojiToast = icon => toast(`${icon} 吃飽了，長大了！`);
 // 遊戲中的寵物：newGame 時帶出場
-function petForGame() { const id = save.pet, lvl = petLvl(id); return id && lvl ? { id, lvl, t: id === 'cat' ? 9 - lvl : 6 - 0.6 * lvl, saves: lvl >= 4 ? 2 : 1, bob: 0, act: null, happy: 0 } : null; }
+function petForGame() { const id = save.pet, lvl = petLvl(id); return id && lvl ? { id, lvl, t: id === 'cat' ? 9 - lvl : id === 'dragon' ? 14 - lvl : 6 - 0.6 * lvl, saves: lvl >= 4 ? 2 : 1, bob: 0, act: null, happy: 0 } : null; }
 const petPos = () => ({ x: S * 0.1, y: H - S * 0.1 });
 // 每隻寵物的代表色（光環、粒子用）
-const PET_COLOR = { cat: '#ffd6a5', dog: '#ffd166', chick: '#fff3a0', bunny: '#ffc8dd', panda: '#e0e0e0' };
+const PET_COLOR = { cat: '#ffd6a5', dog: '#ffd166', chick: '#fff3a0', bunny: '#ffc8dd', panda: '#e0e0e0', fox: '#ff9f1c', dragon: '#80ed99' };
 // 寵物做動作：cat 撲過去、bunny 跳過去接、panda 從天而降的大熊掌、dog/chick 開心跳一下
 function petAct(kind, data = {}) {
   const p = G.pet; if (!p) return;
@@ -4026,8 +4161,32 @@ function updatePet(dt) {
   } else if (p.id === 'panda' && G.boss && !G.boss.fin && !G.boss.enter) {
     p.t -= dt;
     if (p.t <= 0) { p.t = 6 - 0.6 * p.lvl; petAct('slam'); }
+  } else if (p.id === 'dragon') {
+    p.t -= dt;
+    if (p.t <= 0) {
+      // 對準畫面上水果最多的那一排噴火（沒有水果就等一下）
+      const fr = G.objs.filter(o => !o.dead && o.kind !== 'bomb' && o.y > H * 0.15 && o.y < H * 0.85);
+      if (fr.length) {
+        const y = fr.map(o => o.y).sort((a, b) => fr.filter(o => Math.abs(o.y - b) < S * 0.13).length - fr.filter(o => Math.abs(o.y - a) < S * 0.13).length)[0];
+        petAct('happy'); const pp = petPos(); burst(pp.x, pp.y - S * 0.03, 'flame', 10, ['#fff3b0', '#ffd60a', '#ff6a00'], 0.4, 0.015, 0.5);
+        dragonBreath(y); p.t = 14 - p.lvl;
+      } else p.t = 0.5;
+    }
   }
 }
+// 主選單的寵物：會跳、點牠會說話
+function renderMenuPet() {
+  const el = $('menu-pet'), p = PETS.find(x => x.id === save.pet), lvl = p ? petLvl(p.id) : 0;
+  el.classList.toggle('hidden', !p || !lvl);
+  if (p && lvl) el.innerHTML = `<span class="mp-icon">${p.icon}</span><span class="mp-name">${p.name} ${'★'.repeat(lvl)}</span>`;
+}
+$('menu-pet').onclick = () => {
+  audio(); const el = $('menu-pet'), lines = PET_TALK[save.pet] || ['…'];
+  el.classList.remove('jump'); void el.offsetWidth; el.classList.add('jump');
+  const b = $('menu-pet-talk'); b.textContent = lines[Math.random() * lines.length | 0]; b.classList.remove('hidden');
+  clearTimeout(b._t); b._t = setTimeout(() => b.classList.add('hidden'), 1600);
+  tone(900 + Math.random() * 400, 1300, 0.08, 0.05, 'triangle'); buzz(15);
+};
 function drawPet(now) {
   const p = G.pet; if (!p) return;
   const home = petPos(), info = PETS.find(x => x.id === p.id), col = PET_COLOR[p.id];
@@ -4061,6 +4220,8 @@ function drawPet(now) {
 const EVENTS = {
   halloween: { name: '萬聖節', icon: '🎃', from: '10-25', to: '11-02', item: '南瓜', fruit: { id: 'pumpkin', c: '#ff9f1c', s: 1.1 }, rate: 0.25,
     goals: [{ n: 30, coins: 500 }, { n: 100, trail: 'pumpkin' }, { n: 300, coins: 2000 }] },
+  christmas: { name: '聖誕節', icon: '🎄', from: '12-20', to: '12-31', item: '禮物', fruit: { id: 'gift', e: '🎁', c: '#e63946', s: 1.0 }, rate: 0.25,
+    goals: [{ n: 30, coins: 500 }, { n: 100, trail: 'xmas' }, { n: 300, coins: 2000 }] },
 };
 let EVENT_CFG = null; // 雲端 config/event：{ id, from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' } 強制開啟，或 { off: true } 強制關閉
 const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -4099,6 +4260,72 @@ function eventBannerText(ev) {
   const st = eventState(ev), next = ev.goals.find((g, i) => !st.got.includes(i));
   return `${ev.icon} ${ev.name}活動中（到 ${+ev.to.slice(5, 7)}/${+ev.to.slice(8)}）：已切 ${st.n} 顆${ev.item}` + (next ? `・切到 ${next.n} 顆送 ${goalText(ev, next)}` : '・獎勵全部拿到了！');
 }
+
+// ===== 分享成績圖：畫一張 1080×1080 的成績卡，可以的話直接叫出手機的分享（LINE、IG…），不行就全螢幕顯示讓玩家長按儲存 =====
+let lastResult = null;
+function setResult(title, score, best) {
+  const b = blade(), p = PETS.find(x => x.id === save.pet);
+  lastResult = { title, score, best, blade: b, pet: p && petLvl(p.id) ? p.icon : '', name: myName(), date: isoDay(new Date()).replace(/-/g, '/') };
+}
+async function makeShareCard(r) {
+  const c = document.createElement('canvas'); c.width = c.height = 1080;
+  const g = c.getContext('2d'), F = '"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
+  const bg = g.createLinearGradient(0, 0, 1080, 1080); bg.addColorStop(0, '#4a1d4f'); bg.addColorStop(0.55, '#2a0f33'); bg.addColorStop(1, '#14081a');
+  g.fillStyle = bg; g.fillRect(0, 0, 1080, 1080);
+  // 背景散落的水果
+  g.globalAlpha = 0.18; g.font = `90px ${EMOJI_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  ['🍉', '🍓', '🍊', '🍑', '🥝', '🍋', '🍎', '🥥'].forEach((e, i) => g.fillText(e, 120 + (i % 4) * 280 + (i > 3 ? 140 : 0), i > 3 ? 930 : 150));
+  g.globalAlpha = 1;
+  const grad = g.createLinearGradient(0, 230, 0, 330); grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#ff5c8a');
+  g.fillStyle = grad; g.font = `900 110px ${F}`; g.fillText(CONFIG.title, 540, 280);
+  g.fillStyle = '#cfa9c4'; g.font = `700 44px ${F}`; g.fillText(r.title, 540, 380);
+  g.fillStyle = '#ffd166'; g.font = `900 230px ${F}`; g.shadowColor = '#a0522d'; g.shadowOffsetY = 10; g.fillText(String(r.score), 540, 560); g.shadowColor = 'transparent';
+  g.fillStyle = '#fff5f8'; g.font = `700 46px ${F}`; g.fillText(`最高 ${r.best}　・　${r.name}`, 540, 720);
+  // 用的刀＋寵物
+  const img = new Image(); img.src = bladeIcon(r.blade);
+  await new Promise(res => { img.onload = img.onerror = res; });
+  g.drawImage(img, 330, 770, 150, 150);
+  g.font = `700 40px ${F}`; g.textAlign = 'left'; g.fillStyle = '#ffffff'; g.fillText(r.blade.name, 490, 845);
+  if (r.pet) { g.font = `110px ${EMOJI_FONT}`; g.textAlign = 'center'; g.fillText(r.pet, 820, 850); }
+  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.55)'; g.font = `600 34px ${F}`;
+  g.fillText(`${r.date}　mailovewang.github.io/fruit-slash`, 540, 1030);
+  return c;
+}
+async function shareResult() {
+  if (!lastResult) return;
+  audio();
+  const c = await makeShareCard(lastResult), text = `我在${CONFIG.title}拿到 ${lastResult.score} 分！一起來切水果 🍉 https://mailovewang.github.io/fruit-slash/`;
+  try {
+    const blob = await new Promise(res => c.toBlob(res, 'image/png')), file = new File([blob], 'fruit-slash-score.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; } // 玩家自己取消分享
+  $('share-img').src = c.toDataURL('image/png'); $('share-view').classList.remove('hidden');
+}
+$('btn-share-over').onclick = shareResult;
+$('btn-share-clear').onclick = shareResult;
+$('btn-share-close').onclick = () => $('share-view').classList.add('hidden');
+
+// ===== 禪模式：90 秒、沒有炸彈、不會輸，盡量切越多越好（場景從已解鎖的關卡隨機挑） =====
+const ZEN_TIME = 90;
+function startZen() {
+  audio(); curStage = 'zen';
+  newGame(Math.random() * Math.min(save.unlocked, STAGES.length) | 0);
+  G.zen = true; G.nextBoss = Infinity; G.tut = null;
+  state = 'play'; show(null); track('game'); updateHUD();
+}
+function zenEnd() {
+  state = 'over';
+  const rec = G.score > (save.zenBest || 0);
+  recordScore();
+  persist();
+  $('over-title').textContent = '🧘 禪模式結束';
+  setResult('🧘 禪模式 90 秒', G.score, save.zenBest);
+  $('over-score').textContent = G.score; $('over-best').textContent = save.zenBest; $('over-coins').textContent = G.coinsEarned;
+  $('over-record').classList.toggle('hidden', !rec);
+  $('boss-bar').classList.add('hidden');
+  show('over'); sfx.win();
+}
+$('btn-zen').onclick = () => startZen();
 
 // ===== 無盡模式：Boss 一直出現，每打倒一隻就換到下一個關卡的場景，越來越強 =====
 function startEndless() { audio(); curStage = 'endless'; newGame(0); G.endless = true; state = 'play'; show(null); track('game'); updateHUD(); }
@@ -4168,9 +4395,41 @@ async function publishProfile() {
       code: friendCode(), name: myName(), title: t ? t.icon + ' ' + t.name : '', blade: save.equipped,
       best: Math.min(99999, save.best | 0), endless: Math.min(999, stats().endlessBest | 0),
       cleared: Object.keys(save.cleared || {}).length, updatedAt: serverTimestamp(),
+      ...weekFields(),
     });
   } catch (e) {}
 }
+// ===== 每週排行榜：每週一 0 點重新計算（週 ID = 那一週星期一的日期） =====
+function weekId(d = new Date()) { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - (m.getDay() + 6) % 7); return isoDay(m); }
+const lastWeekId = () => { const d = new Date(); d.setDate(d.getDate() - 7); return weekId(d); };
+// 一局結束時記錄本週最高分；換週時把上週的成績留到 prevWeek（領獎要用）
+function recordWeek(score) {
+  const w = weekId();
+  if (!save.week || save.week.id !== w) { if (save.week && save.week.id === lastWeekId()) save.prevWeek = save.week; save.week = { id: w, best: 0 }; }
+  save.week.best = Math.max(save.week.best, score | 0);
+}
+function weekFields() {
+  const w = weekId(), cur = save.week && save.week.id === w ? save.week.best : 0;
+  const prev = save.week && save.week.id === lastWeekId() ? save.week : save.prevWeek && save.prevWeek.id === lastWeekId() ? save.prevWeek : null;
+  return { week: w, wbest: Math.min(99999, cur | 0), pweek: prev ? prev.id : '', pwbest: prev ? Math.min(99999, prev.best | 0) : 0 };
+}
+// 上週前三名的獎勵：打開排行榜時檢查，每週只領一次
+const WEEK_PRIZE = [3000, 2000, 1000];
+async function claimWeekPrize() {
+  const lw = lastWeekId();
+  if (!socialOk() || save.weekPrize === lw) return;
+  try {
+    const { collection, getDocs, query, where } = CLOUD.api, rows = {};
+    const [a, b] = await Promise.all([getDocs(query(collection(CLOUD.db, 'profiles'), where('week', '==', lw))), getDocs(query(collection(CLOUD.db, 'profiles'), where('pweek', '==', lw)))]);
+    a.forEach(d => { const p = d.data(); rows[p.code] = Math.max(rows[p.code] || 0, p.wbest || 0); });
+    b.forEach(d => { const p = d.data(); rows[p.code] = Math.max(rows[p.code] || 0, p.pwbest || 0); });
+    const rank = Object.entries(rows).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]).findIndex(([c]) => c === friendCode());
+    save.weekPrize = lw;
+    if (rank >= 0 && rank < 3) { save.coins += WEEK_PRIZE[rank]; toast(`🏆 上週排行榜第 ${rank + 1} 名！獎勵 +${WEEK_PRIZE[rank]} 💰`); sfx.win(); }
+    persist();
+  } catch (e) {}
+}
+
 // 用好友碼查公開資料（換手機會產生新的資料，取最新的那份）
 async function findProfiles(codes) {
   if (!socialOk() || !codes.length) return {};
@@ -4316,8 +4575,8 @@ async function challengeEnd() {
 
 // ----- 排行榜：總分、無盡模式、通關數；全部玩家或只看好友 -----
 const RANK_TABS = { best: '最高分', endless: '無盡模式（Boss 數）', cleared: '通關數' };
-let rankTab = 'best', rankScope = 'all';
-async function openRank() { state = 'rank'; show('rank'); await publishProfile(); renderRank(); }
+let rankTab = 'week', rankScope = 'all';
+async function openRank() { state = 'rank'; show('rank'); await publishProfile(); renderRank(); claimWeekPrize(); }
 async function renderRank() {
   for (const b of document.querySelectorAll('.rtab')) b.classList.toggle('active', b.dataset.r === rankTab || b.dataset.s === rankScope);
   const list = $('rank-list'), me = friendCode();
@@ -4325,22 +4584,28 @@ async function renderRank() {
   list.innerHTML = '<p class="stat">讀取中…</p>';
   try {
     let rows;
+    const wk = weekId(), val = p => (rankTab === 'week' ? (p.week === wk ? p.wbest || 0 : 0) : p[rankTab] || 0);
     if (rankScope === 'friends') rows = Object.values(await findProfiles([me, ...(save.friends || [])]));
     else {
-      const { collection, getDocs, query, orderBy, limit } = CLOUD.api;
-      const snap = await getDocs(query(collection(CLOUD.db, 'profiles'), orderBy(rankTab, 'desc'), limit(40)));
+      const { collection, getDocs, query, orderBy, limit, where } = CLOUD.api;
+      // 本週榜：只抓這週有玩的人（玩家不多，直接在手機上排序）
+      const snap = await getDocs(rankTab === 'week' ? query(collection(CLOUD.db, 'profiles'), where('week', '==', wk))
+        : query(collection(CLOUD.db, 'profiles'), orderBy(rankTab, 'desc'), limit(40)));
       const seen = {}; rows = [];
-      snap.forEach(d => { const p = d.data(); if (!seen[p.code]) { seen[p.code] = 1; rows.push(p); } });
+      snap.forEach(d => { const p = d.data(); if (!seen[p.code] || val(p) > val(seen[p.code])) { if (seen[p.code]) rows.splice(rows.indexOf(seen[p.code]), 1); seen[p.code] = p; rows.push(p); } });
     }
-    rows.sort((a, b) => (b[rankTab] || 0) - (a[rankTab] || 0));
+    if (rankTab === 'week') rows = rows.filter(p => val(p) > 0);
+    rows.sort((a, b) => val(b) - val(a));
     const top = rows.slice(0, 10), myIdx = rows.findIndex(p => p.code === me);
     list.innerHTML = '';
     top.forEach((p, i) => {
       const row = document.createElement('div'); row.className = 'rrow' + (p.code === me ? ' me' : '');
-      row.innerHTML = `<span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rn">${bladeIconOf(p.blade)} ${esc(p.name)}${p.title ? ' <small>' + esc(p.title) + '</small>' : ''}</span><span class="rv">${esc(p[rankTab] || 0)}</span>`;
+      row.innerHTML = `<span class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span class="rn">${bladeIconOf(p.blade)} ${esc(p.name)}${p.title ? ' <small>' + esc(p.title) + '</small>' : ''}</span><span class="rv">${esc(val(p))}</span>`;
       list.appendChild(row);
     });
-    $('rank-me').textContent = myIdx >= 10 ? `你的名次：第 ${myIdx + 1} 名` : myIdx < 0 ? '打完一局就會出現在排行榜上' : '';
+    const tip = rankTab === 'week' ? '　每週一 0 點重新計算，上週前三名送 3000／2000／1000 💰（打開排行榜時自動領取）' : '';
+    if (!top.length) list.innerHTML = '<p class="stat">這週還沒有人上榜，快去搶第一！</p>';
+    $('rank-me').textContent = (myIdx >= 10 ? `你的名次：第 ${myIdx + 1} 名` : myIdx < 0 ? '打完一局就會出現在排行榜上' : '') + tip;
   } catch (e) { list.innerHTML = '<p class="stat">⚠️ 讀取失敗，請稍後再試</p>'; }
 }
 for (const b of document.querySelectorAll('.rtab')) b.onclick = () => { audio(); if (b.dataset.r) rankTab = b.dataset.r; if (b.dataset.s) rankScope = b.dataset.s; renderRank(); };
