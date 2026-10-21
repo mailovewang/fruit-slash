@@ -295,6 +295,44 @@
   .stage-head { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
   .stage-head h2 { margin: 0; }
   @media (orientation: landscape) and (max-height: 600px) { .stage { padding: 6px 4px; } .stage .s-icon { font-size: 24px; } #stages { gap: 8px; } }
+  /* ===== 扭蛋動畫 ===== */
+  #gacha-anim { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; overflow: hidden;
+    padding: calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 10px);
+    background: radial-gradient(circle at 50% 45%, #5a1e64, #0a040e 75%); }
+  #ga-title { margin: 0; font-size: 22px; color: var(--gold); text-shadow: 0 2px 0 #7a1f4a; }
+  #ga-grid { display: grid; grid-template-columns: repeat(var(--cols), auto); gap: 10px 14px; justify-content: center; }
+  .ga-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; width: calc(var(--sz) * 1.25); }
+  .ga-cap { position: relative; width: var(--sz); height: var(--sz); animation: gadrop .6s cubic-bezier(.3,1.5,.55,1) both; animation-delay: var(--d); }
+  .ga-top, .ga-bot { position: absolute; left: 0; width: 100%; height: 50%; transition: transform .45s cubic-bezier(.5,-.3,.6,1.4), opacity .45s; }
+  .ga-top { top: 0; border-radius: 999px 999px 0 0; background: var(--c); box-shadow: inset -8px 8px 14px rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.15); }
+  .ga-bot { bottom: 0; border-radius: 0 0 999px 999px; background: linear-gradient(180deg, #fff, #e9dcf5); box-shadow: inset 6px -6px 12px rgba(120,80,160,.25); }
+  .ga-item { position: absolute; inset: 8%; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.2); transition: transform .5s cubic-bezier(.3,1.8,.5,1) .1s, opacity .3s .1s; }
+  .ga-item img { width: 100%; height: 100%; filter: drop-shadow(0 0 8px rgba(255,255,255,.7)); }
+  .ga-sw { width: 80%; height: 80%; border-radius: 50%; box-shadow: 0 0 16px rgba(255,255,255,.6); }
+  .ga-emoji { font-size: calc(var(--sz) * .6); line-height: 1; }
+  .ga-cap.landed { animation: none; }
+  .ga-cap.shake { animation: gashake .5s ease-in-out infinite; }
+  .ga-cap.open .ga-top { transform: translate(-30%, -70%) rotate(-35deg); opacity: 0; }
+  .ga-cap.open .ga-bot { transform: translate(25%, 60%) rotate(25deg); opacity: 0; }
+  .ga-cap.open .ga-item { opacity: 1; transform: scale(1); }
+  /* 稀有：金色放射光芒，搖晃時就開始轉 */
+  .ga-rays { position: absolute; inset: -55%; border-radius: 50%; opacity: 0; pointer-events: none;
+    background: repeating-conic-gradient(rgba(255,230,140,.55) 0 10deg, transparent 10deg 24deg); -webkit-mask: radial-gradient(circle, #000 25%, transparent 70%); mask: radial-gradient(circle, #000 25%, transparent 70%);
+    animation: garays 3s linear infinite; transition: opacity .4s; }
+  .ga-cap.rare.shake .ga-rays { opacity: .6; }
+  .ga-cap.rare.open .ga-rays { opacity: 1; }
+  .ga-cap.rare.open { filter: drop-shadow(0 0 18px #ffd166); }
+  .ga-label { text-align: center; line-height: 1.2; opacity: 0; transform: translateY(6px); transition: .3s .25s; max-width: 100%; }
+  .ga-cell.shown .ga-label { opacity: 1; transform: none; }
+  .ga-label b { display: block; font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ga-label small { font-size: 11px; color: var(--muted); }
+  .ga-label small.hot { color: #ffd166; font-weight: 900; }
+  .ga-conf { position: fixed; width: 8px; height: 12px; border-radius: 2px; pointer-events: none; animation: gaconf 1.2s cubic-bezier(.2,.8,.4,1) forwards; }
+  @keyframes gadrop { 0% { transform: translateY(-120vh) rotate(-30deg); } 70% { transform: translateY(6%) rotate(4deg); } 100% { transform: none; } }
+  @keyframes gashake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-10deg) translateX(-2px); } 75% { transform: rotate(10deg) translateX(2px); } }
+  @keyframes garays { to { transform: rotate(360deg); } }
+  @keyframes gaconf { to { transform: translate(var(--x), calc(var(--y) + 160px)) rotate(var(--r)); opacity: 0; } }
+  @media (orientation: landscape) and (max-height: 600px) { #ga-title { font-size: 18px; } #ga-grid { gap: 4px 10px; } }
   #share-view { position: fixed; inset: 0; z-index: 50; background: rgba(10,4,14,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; }
   #share-view img { max-width: min(92vw, 520px); max-height: 72vh; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.6); user-select: auto; -webkit-user-select: auto; -webkit-touch-callout: default; touch-action: auto; }
   #share-view p { margin: 0; color: var(--muted); font-size: 14px; text-align: center; }
@@ -325,6 +363,7 @@
 <div id="scroll-hint" class="hidden">⬇ 往下滑還有更多</div>
 <button id="update-bar" class="hidden"></button>
 <div id="toast" class="hidden"></div>
+<div id="gacha-anim" class="hidden"><h2 id="ga-title"></h2><div id="ga-grid"></div><div class="btn-row"><button class="btn ghost small" id="ga-skip">跳過 ⏩</button><button class="btn hidden" id="ga-ok">好！</button></div></div>
 <div id="share-view" class="hidden"><img id="share-img" alt="成績圖"><p id="share-tip"></p><div class="btn-row"><a class="btn" id="btn-share-dl" download>⬇ 下載圖片</a><button class="btn ghost" id="btn-share-close">關閉</button></div></div>
 
 <div id="loading">
@@ -683,9 +722,13 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '2.1.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '2.1.2'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '2.1.2': [
+    '🎰 扭蛋有動畫了：扭蛋掉下來、搖一搖、啵！打開；抽到神刀會發金光、放彩帶',
+    '⏩ 十連抽會一顆一顆打開，等不及可以按「跳過」直接看結果',
+  ],
   '2.1.1': [
     '📤 修正分享成績：新版 APK（1.4）按分享會直接跳出手機的分享選單，可以傳到 LINE、IG',
     '⬇ 用瀏覽器玩的話，沒辦法直接分享時會出現「下載圖片」按鈕',
@@ -4020,19 +4063,20 @@ function gachaOnce() {
   let r = Math.random() * pool.reduce((a, p) => a + p.w, 0), pick = pool[0];
   for (const p of pool) { if ((r -= p.w) < 0) { pick = p; break; } }
   save.trails = Object.assign({ default: true }, save.trails || {});
+  // 回傳：text 文字結果、rare 稀有（刀）、kind/id 給動畫畫圖用、name 名字、tag 小標（NEW!、Lv.3、+200💰）、isNew 第一次拿到
   if (pick.kind === 'blade') {
     g.pity = 0;
-    const b = BLADES.find(x => x.id === pick.id);
-    if (!save.owned[b.id]) { save.owned[b.id] = true; save.levels[b.id] = 1; return { text: `${b.icon} ${b.name}（新刀！）`, rare: true }; }
-    if ((save.levels[b.id] || 1) < MAX_LEVEL) { save.levels[b.id] = (save.levels[b.id] || 1) + 1; return { text: `${b.icon} ${b.name} 升到 Lv.${save.levels[b.id]}`, rare: true }; }
-    save.coins += 3000; return { text: `${b.icon} ${b.name}（已滿級，換 3000 💰）`, rare: true };
+    const b = BLADES.find(x => x.id === pick.id), base = { rare: true, kind: 'blade', id: b.id, name: b.name };
+    if (!save.owned[b.id]) { save.owned[b.id] = true; save.levels[b.id] = 1; return { ...base, text: `${b.icon} ${b.name}（新刀！）`, tag: 'NEW!', isNew: true }; }
+    if ((save.levels[b.id] || 1) < MAX_LEVEL) { save.levels[b.id] = (save.levels[b.id] || 1) + 1; return { ...base, text: `${b.icon} ${b.name} 升到 Lv.${save.levels[b.id]}`, tag: `升到 Lv.${save.levels[b.id]}` }; }
+    save.coins += 3000; return { ...base, text: `${b.icon} ${b.name}（已滿級，換 3000 💰）`, tag: '+3000💰' };
   }
   if (pick.kind === 'trail') {
-    const t = TRAILS.find(x => x.id === pick.id);
-    if (!save.trails[t.id]) { save.trails[t.id] = true; return { text: `✨ ${t.name}（新！）` }; }
-    save.coins += 200; return { text: `✨ ${t.name}（重複，換 200 💰）` };
+    const t = TRAILS.find(x => x.id === pick.id), base = { kind: 'trail', id: t.id, name: t.name };
+    if (!save.trails[t.id]) { save.trails[t.id] = true; return { ...base, text: `✨ ${t.name}（新！）`, tag: 'NEW!', isNew: true }; }
+    save.coins += 200; return { ...base, text: `✨ ${t.name}（重複，換 200 💰）`, tag: '重複 +200💰' };
   }
-  save.coins += pick.n; return { text: `💰 ${pick.n} 金幣` };
+  save.coins += pick.n; return { kind: 'coins', name: `${pick.n} 金幣`, text: `💰 ${pick.n} 金幣`, tag: `+${pick.n}💰` };
 }
 function gachaDraw(times) {
   const cost = times === 10 ? GACHA_10_COST : GACHA_COST;
@@ -4040,9 +4084,73 @@ function gachaDraw(times) {
   save.coins -= cost;
   gachaLast = Array.from({ length: times }, gachaOnce);
   persist();
-  if (gachaLast.some(x => x.rare)) { sfx.win(); buzz([40, 30, 80]); } else sfx.coin();
   renderShop();
+  playGachaAnim(gachaLast);
 }
+
+// ===== 扭蛋動畫：扭蛋掉下來彈一下 → 搖晃（喀啦喀啦）→ 啵！上下殼彈開、獎品跳出來；抽到刀會發金光、放射光芒和彩帶 =====
+let gachaAnim = null;
+// 扭蛋音效：落地「喀」、搖晃「喀啦喀啦」、打開「啵！」、抽到刀的號角＋叮叮叮
+function gsfx(kind) {
+  if (!actx || !settings().sfx) return;
+  if (kind === 'drop') { tone(420, 180, 0.07, 0.08, 'square'); sweepNoise(0.04, 2500, 1200, 1, 0.08, 'bandpass'); }
+  else if (kind === 'rattle') for (let i = 0; i < 6; i++) { sweepNoise(0.03, 3200, 2200, 3, 0.07, 'bandpass', i * 0.08); tone(1500 + Math.random() * 400, 1200, 0.02, 0.03, 'square', i * 0.08 + 0.02); }
+  else if (kind === 'pop') { sweepNoise(0.08, 900, 3500, 1.2, 0.18, 'bandpass'); tone(700, 1400, 0.1, 0.08, 'sine'); tone(1568, 1580, 0.15, 0.05, 'triangle', 0.06); }
+  else if (kind === 'rare') {
+    sweepNoise(0.1, 700, 4000, 1, 0.22, 'bandpass'); tone(80, 50, 0.4, 0.25, 'sine');
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, f * 1.01, 0.35, 0.09, 'triangle', 0.08 + i * 0.07));
+  }
+}
+function gachaItemHTML(r) {
+  if (r.kind === 'blade') return `<img src="${bladeIcon(BLADES.find(b => b.id === r.id))}" alt="">`;
+  if (r.kind === 'trail') { const t = TRAILS.find(x => x.id === r.id); return `<span class="ga-sw" style="background:linear-gradient(135deg,${t.colors.join(',')})"></span>`; }
+  return '<span class="ga-emoji">💰</span>';
+}
+function playGachaAnim(results) {
+  const el = $('gacha-anim'), grid = $('ga-grid'), single = results.length === 1;
+  grid.style.setProperty('--cols', single ? 1 : 5);
+  grid.style.setProperty('--sz', single ? 'min(38vw, 150px)' : 'min(13vw, 66px)');
+  // 殼的顏色：刀是金色、新刀光是粉紅、其他是藍色（搖晃時就看得出來有沒有中大獎）
+  grid.innerHTML = results.map((r, i) => {
+    const col = r.rare ? 'linear-gradient(135deg,#fff3b0,#ffd166 45%,#e09f00)' : r.isNew ? 'linear-gradient(135deg,#ffd6e5,#ff5c8a)' : 'linear-gradient(135deg,#caf0f8,#48cae4)';
+    return `<div class="ga-cell"><div class="ga-cap${r.rare ? ' rare' : ''}" style="--c:${col};--d:${i * 0.08}s"><span class="ga-rays"></span><span class="ga-top"></span><span class="ga-bot"></span><span class="ga-item">${gachaItemHTML(r)}</span></div>
+      <div class="ga-label"><b>${esc(r.name)}</b><small class="${r.isNew || r.rare ? 'hot' : ''}">${esc(r.tag)}</small></div></div>`;
+  }).join('');
+  $('ga-title').textContent = single ? '🎰 扭蛋中…' : '🎰 十連抽！';
+  $('ga-ok').classList.add('hidden'); $('ga-skip').classList.remove('hidden');
+  el.classList.remove('hidden');
+  const caps = [...grid.querySelectorAll('.ga-cap')], cells = [...grid.querySelectorAll('.ga-cell')], timers = [];
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  gachaAnim = { timers, finish: null };
+  // 1. 掉下來（每顆落地喀一聲）
+  caps.forEach((c, i) => at(i * 80 + 380, () => gsfx('drop')));
+  const dropEnd = caps.length * 80 + 550;
+  // 2. 一起搖晃
+  at(dropEnd, () => { caps.forEach(c => c.classList.add('landed', 'shake')); gsfx('rattle'); });
+  // 3. 一顆一顆打開（稀有的放在最後開，期待感比較強）
+  const order = caps.map((c, i) => i).sort((a, b) => (results[a].rare ? 1 : 0) - (results[b].rare ? 1 : 0));
+  const openOne = i => { if (caps[i].classList.contains('open')) return; caps[i].classList.remove('shake'); caps[i].classList.add('open'); cells[i].classList.add('shown');
+    gsfx(results[i].rare ? 'rare' : 'pop'); if (results[i].rare) { confetti(caps[i]); buzz([40, 30, 80]); } };
+  const step = single ? 0 : 220, openStart = dropEnd + (single ? 900 : 700);
+  order.forEach((i, k) => at(openStart + k * step + (results[i].rare && !single ? 350 : 0), () => openOne(i)));
+  const finish = () => { timers.forEach(clearTimeout); caps.forEach((c, i) => openOne(i)); $('ga-title').textContent = results.some(r => r.rare) ? '🎉 恭喜抽到神刀！' : '🎁 抽獎結果';
+    $('ga-skip').classList.add('hidden'); $('ga-ok').classList.remove('hidden'); gachaAnim.finish = null; };
+  gachaAnim.finish = finish;
+  at(openStart + order.length * step + 700, finish);
+}
+// 彩帶：從那顆扭蛋的位置往外噴
+function confetti(cap) {
+  const box = $('gacha-anim'), r = cap.getBoundingClientRect(), cols = ['#ff5c8a', '#ffd166', '#80ed99', '#a0c4ff', '#e0aaff'];
+  for (let i = 0; i < 26; i++) {
+    const s = document.createElement('i'); s.className = 'ga-conf';
+    const a = Math.random() * Math.PI * 2, d = 80 + Math.random() * 140;
+    s.style.cssText = `left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;background:${cols[i % 5]};--x:${Math.cos(a) * d}px;--y:${Math.sin(a) * d - 60}px;--r:${Math.random() * 720 - 360}deg`;
+    box.appendChild(s); setTimeout(() => s.remove(), 1300);
+  }
+}
+$('ga-skip').onclick = e => { e.stopPropagation(); if (gachaAnim && gachaAnim.finish) gachaAnim.finish(); };
+$('ga-ok').onclick = e => { e.stopPropagation(); $('gacha-anim').classList.add('hidden'); renderShop(); };
+$('gacha-anim').onclick = () => { if (gachaAnim && gachaAnim.finish) gachaAnim.finish(); }; // 點畫面任何地方也能直接看結果
 function renderGacha(list, det) {
   const pct = w => Math.round(w / GACHA_POOL.reduce((a, p) => a + p.w, 0) * 1000) / 10 + '%';
   for (const p of GACHA_POOL) {
@@ -4645,6 +4753,7 @@ const BACK_BTN = { paused: 'btn-resume', shop: 'btn-shop-back', stages: 'btn-sta
   chalres: 'btn-chal-back', over: 'btn-over-menu', clear: 'btn-clear-menu', whatsnew: 'btn-wn-ok' };
 if (NATIVE.App) NATIVE.App.addListener('backButton', () => {
   if (!$('share-view').classList.contains('hidden')) return $('share-view').classList.add('hidden');
+  if (!$('gacha-anim').classList.contains('hidden')) return gachaAnim && gachaAnim.finish ? gachaAnim.finish() : $('ga-ok').click();
   if (state === 'play') return pauseGame();
   if (state === 'menu') { persist(); cloudSync(); return NATIVE.App.exitApp(); }
   const id = BACK_BTN[state]; if (id) $(id).click();
