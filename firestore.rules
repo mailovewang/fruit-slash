@@ -37,15 +37,39 @@ service cloud.firestore {
     function shortStr(v, n) { return v is string && v.size() <= n; }
     function num(v, n) { return v is int && v >= 0 && v <= n; }
 
+    // 遊戲設定（例如 config/event 活動開關）：大家都能讀，只有管理員能改
+    match /config/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // 被管理員封鎖的玩家（文件 ID = uid）：不能再上排行榜、送禮、發挑戰
     function notBanned() { return !exists(/databases/$(database)/documents/banned/$(request.auth.uid)); }
     match /banned/{uid} {
       allow read, write: if isAdmin();
     }
 
+    // 好友碼登記（不公開）：文件 ID = 好友碼，記錄目前是哪個帳號在用。
+    // 只有「自己的雲端存檔（恢復碼 rc）裡記的好友碼就是這組」才能登記，換手機用恢復碼找回後也能重新登記，別人冒用不了。
+    function validCodeClaim(code) {
+      return authed() && fcode(code)
+        && request.resource.data.keys().hasOnly(['uid', 'rc'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.rc is string && request.resource.data.rc.matches('FRUIT-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}')
+        && get(/databases/$(database)/documents/saves/$(request.resource.data.rc)).data.save.friendCode == code;
+    }
+    match /codes/{code} {
+      allow read, delete: if isAdmin();
+      allow create: if validCodeClaim(code);
+      // 換手機重新登記：必須用「第一次登記時的同一組恢復碼」（恢復碼不公開，別人拿不到）
+      allow update: if validCodeClaim(code) && request.resource.data.rc == resource.data.rc;
+    }
+    function ownsCode(c) { return get(/databases/$(database)/documents/codes/$(c)).data.uid == request.auth.uid; }
+
     function validProfile() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['code', 'name', 'title', 'blade', 'best', 'endless', 'cleared', 'updatedAt'])
+      return ownsCode(d.code)
+        && d.keys().hasOnly(['code', 'name', 'title', 'blade', 'best', 'endless', 'cleared', 'updatedAt'])
         && fcode(d.code) && shortStr(d.name, 40) && shortStr(d.title, 40) && shortStr(d.blade, 20)
         && num(d.best, 99999) && num(d.endless, 999) && num(d.cleared, 50)
         && d.updatedAt == request.time;

@@ -48,9 +48,18 @@
     </div>
     <div class="wrap">
       <table>
-        <thead><tr><th>暱稱</th><th>恢復碼</th><th>金幣</th><th>最高分</th><th>通關</th><th>版本</th><th>最後同步</th><th></th></tr></thead>
+        <thead><tr><th>暱稱</th><th>恢復碼</th><th>金幣</th><th>最高分</th><th>通關</th><th>局數</th><th>切水果</th><th>Boss</th><th>簽到</th><th>寵物</th><th>版本</th><th>最後同步</th><th></th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
+    </div>
+    <h2 style="font-size:17px;margin:24px 0 8px">🎉 活動開關</h2>
+    <p id="evmsg" style="color:var(--muted);font-size:13px;margin:0 0 8px"></p>
+    <div class="bar">
+      <select id="ev-id" style="font:inherit;padding:8px;border-radius:10px;background:var(--panel);color:var(--text);border:1px solid var(--line)"><option value="halloween">🎃 萬聖節</option></select>
+      從 <input type="date" id="ev-from" style="width:auto"> 到 <input type="date" id="ev-to" style="width:auto">
+      <button id="ev-on">強制開啟這段時間</button>
+      <button id="ev-off" class="ghost">強制關閉</button>
+      <button id="ev-auto" class="ghost">恢復依日期自動</button>
     </div>
     <h2 style="font-size:17px;margin:24px 0 8px">🏆 排行榜玩家（公開資料）</h2>
     <p id="pmsg" style="color:var(--muted);font-size:13px;margin:0 0 8px">「移除」：從排行榜拿掉（玩家下次開遊戲會重新出現）。「封鎖」：拿掉而且不能再上榜、送禮、發挑戰。</p>
@@ -74,7 +83,7 @@ if (!cfg || !cfg.apiKey) {
 } else {
   const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
   const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
-  const { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc, setDoc, serverTimestamp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+  const { getFirestore, collection, getDocs, getDoc, query, orderBy, doc, deleteDoc, setDoc, serverTimestamp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
   const app = initializeApp(cfg);
   if (window.RECAPTCHA_SITE_KEY) {
     const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app-check.js`);
@@ -102,7 +111,7 @@ if (!cfg || !cfg.apiKey) {
       const snap = await getDocs(query(collection(db, 'saves'), orderBy('updatedAt', 'desc')));
       rows = snap.docs.map(d => ({ code: d.id, ...d.data() }));
       $('msg').textContent = ''; $('list').hidden = false; render();
-      loadProfiles();
+      loadProfiles(); loadEvent();
     } catch (e) {
       $('list').hidden = true;
       const uid = auth.currentUser && auth.currentUser.uid;
@@ -120,8 +129,11 @@ if (!cfg || !cfg.apiKey) {
     for (const r of list) {
       const s = r.stats || {}, t = r.updatedAt ? r.updatedAt.toDate().toLocaleString('zh-TW', { hour12: false }) : '—';
       const tr = document.createElement('tr');
-      const cells = [r.name || '（無暱稱）', r.code, s.coins ?? '—', s.best ?? '—', `${s.cleared ?? 0} / 10`, r.version || '—', t];
-      cells.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 1) td.className = 'code'; if (i >= 2 && i <= 3) td.className = 'num'; tr.appendChild(td); });
+      // 遊玩狀況：從玩家存檔裡的統計拿（局數、切了幾顆水果、打倒幾隻 Boss、簽到天數、帶哪隻寵物）
+      const sv = r.save || {}, st = sv.stats || {}, pets = { cat: '🐱', dog: '🐶', chick: '🐥', bunny: '🐰', panda: '🐼' };
+      const cells = [r.name || '（無暱稱）', r.code, s.coins ?? '—', s.best ?? '—', `${s.cleared ?? 0} / 10`, st.game ?? 0, st.fruit ?? 0, st.boss ?? 0,
+        sv.checkin ? sv.checkin.days : 0, sv.pet ? (pets[sv.pet] || sv.pet) : '—', r.version || '—', t];
+      cells.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 1) td.className = 'code'; if ((i >= 2 && i <= 3) || (i >= 5 && i <= 8)) td.className = 'num'; tr.appendChild(td); });
       const btn = document.createElement('button'); btn.className = 'copy ghost'; btn.textContent = '複製';
       btn.onclick = () => navigator.clipboard.writeText(r.code).then(() => { btn.textContent = '已複製'; setTimeout(() => btn.textContent = '複製', 1500); });
       tr.children[1].appendChild(btn);
@@ -138,6 +150,24 @@ if (!cfg || !cfg.apiKey) {
       tb.appendChild(tr);
     }
   }
+
+  // ===== 活動開關：沒設定時遊戲依內建日期自動開關（萬聖節 10/25～11/2）；這裡可以強制開某段時間或強制關閉 =====
+  const evRef = () => doc(db, 'config', 'event');
+  async function loadEvent() {
+    try {
+      const s = await getDoc(evRef()), d = s.exists() ? s.data() : null;
+      $('evmsg').textContent = !d ? '目前：依日期自動（萬聖節每年 10/25～11/2）' : d.off ? '目前：強制關閉所有活動' : `目前：強制開啟 ${d.id}，${d.from} ～ ${d.to}`;
+      if (d && d.from) { $('ev-from').value = d.from; $('ev-to').value = d.to; $('ev-id').value = d.id; }
+    } catch (e) { $('evmsg').textContent = '活動設定讀取失敗：' + e.message; }
+  }
+  const evDo = async (fn, ok) => { try { await fn(); $('evmsg').textContent = ok; setTimeout(loadEvent, 800); } catch (e) { $('evmsg').textContent = '失敗：' + e.message; } };
+  $('ev-on').onclick = () => {
+    const from = $('ev-from').value, to = $('ev-to').value;
+    if (!from || !to || from > to) { $('evmsg').textContent = '請先選好開始和結束日期'; return; }
+    evDo(() => setDoc(evRef(), { id: $('ev-id').value, from, to }), '✅ 已開啟，玩家重新打開遊戲就會看到');
+  };
+  $('ev-off').onclick = () => evDo(() => setDoc(evRef(), { off: true }), '✅ 已關閉所有活動');
+  $('ev-auto').onclick = () => evDo(() => deleteDoc(evRef()), '✅ 已恢復依日期自動');
 
   // ===== 排行榜玩家管理：移除、封鎖 =====
   let profiles = [], bannedSet = new Set();

@@ -177,6 +177,11 @@
   .shop-head .stat { margin: 0; }
   .shop-head .tabs { width: auto; flex: 1; max-width: 340px; }
   .shop-head .tab { padding: 7px 10px; font-size: 14px; }
+  .shop-head .shop-tabs { max-width: 520px; }
+  .shop-head .shop-tabs .tab { padding: 7px 4px; font-size: 13px; white-space: nowrap; }
+  .gacha-res { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+  .gacha-res span { background: rgba(255,255,255,.08); border: 1px solid rgba(255,209,102,.4); border-radius: 10px; padding: 3px 8px; font-size: 12px; }
+  .gacha-res span.rare { border-color: #ff5c8a; background: rgba(255,92,138,.18); font-weight: 800; }
   .btn.small { min-width: 0; padding: 7px 14px; font-size: 14px; box-shadow: none; }
   .shop-body { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 980px; }
   #shop-list.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; max-width: none; align-content: start; }
@@ -324,6 +329,7 @@
   <h1 class="title" id="menu-title">寶貝切切樂</h1>
   <p class="subtitle" id="menu-sub"></p>
   <p class="stat">最高分 <b id="menu-best">0</b>　金幣 <b id="menu-coins">0</b></p>
+  <button class="btn ghost small hidden" id="event-banner"></button>
   <div class="btn-row">
   <button class="btn" id="btn-play">開始遊戲</button>
   <button class="btn alt" id="btn-shop">🛒 商店</button>
@@ -474,7 +480,7 @@
     <button class="btn ghost small" id="btn-shop-back">← 返回</button>
     <h2>🛒 商店</h2>
     <span class="stat">💰 <b id="shop-coins">0</b></span>
-    <div class="tabs"><button class="tab active" data-tab="blades">🔪 刀具</button><button class="tab" data-tab="perks">⭐ 強化</button><button class="tab" data-tab="trails">✨ 刀光</button></div>
+    <div class="tabs shop-tabs"><button class="tab active" data-tab="blades">🔪 刀具</button><button class="tab" data-tab="perks">⭐ 強化</button><button class="tab" data-tab="trails">✨ 刀光</button><button class="tab" data-tab="pets">🐾 寵物</button><button class="tab" data-tab="gacha">🎰 扭蛋</button></div>
   </div>
   <div class="shop-body"><div id="shop-list" class="tiles"></div><div id="shop-detail" class="detail"></div></div>
 </div>
@@ -555,7 +561,19 @@ const BLADES = [
     desc: '有機率召喚龍息，橫掃整排水果。' },
   { id: 'angel', name: '天使之刃', icon: '👼', price: 50000, special: true, power: 3.0, colors: ['#ffffff', '#fff3b0', '#ffd6e5'], finisher: '天使降臨',
     desc: '每日簽到 30 天才能獲得的限定神刀。天使光束會切開整排水果，還有機率回復愛心。' },
+  // 扭蛋限定：一把刀同時擁有兩種屬性（fx），擊殺技借用其中一種（fin）
+  { id: 'moon', name: '月影刀', icon: '🌙', price: 20000, gacha: true, power: 2.2, fx: ['ice', 'shadow'], fin: 'shadow', colors: ['#ffffff', '#c8d7ff', '#5465a8'], finisher: '月影殺',
+    desc: '扭蛋限定・冰＋影雙屬性：會讓時間變慢，還會召喚影子分身斬殺其他水果。' },
+  { id: 'lavabolt', name: '熔岩雷刀', icon: '🌋', price: 20000, gacha: true, power: 2.3, fx: ['fire', 'thunder'], fin: 'thunder', colors: ['#fff3a0', '#ff7b00', '#9d0208'], finisher: '熔雷天罰',
+    desc: '扭蛋限定・火＋雷雙屬性：切開的水果會爆炸，閃電還會連鎖劈中附近的水果。' },
+  { id: 'clover', name: '幸運草刀', icon: '🍀', price: 20000, gacha: true, power: 2.0, fx: ['gold', 'love'], fin: 'gold', colors: ['#f1ffe7', '#7bd389', '#2d6a4f'], finisher: '幸運降臨',
+    desc: '扭蛋限定・金＋愛雙屬性：金幣 +25%、常常噴出額外金幣，還有機率回復愛心。' },
+  { id: 'blossom', name: '花吹雪', icon: '💮', price: 20000, gacha: true, power: 2.2, fx: ['sakura', 'wind'], fin: 'sakura', colors: ['#ffffff', '#ffd6e5', '#b5e48c'], finisher: '花吹雪',
+    desc: '扭蛋限定・櫻＋風雙屬性：判定範圍變大，切水果會放出追蹤花瓣。' },
 ];
+// 刀的屬性：一般刀就是自己，扭蛋刀有兩種；擊殺技用 fin 指定的那一種
+const fxOf = b => b.fx || [b.id];
+const finOf = b => b.fin || b.id;
 
 // 關卡：每關 5 隻 Boss，打完解鎖下一關。fx = Boss 戰時的專屬背景動畫
 const STAGES = [
@@ -644,9 +662,18 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.9.4'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '2.0.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '2.0.0': [
+    '🐾 新增寵物：小貓咪、小狗狗、小雞、小兔兔、貓熊，每隻幫忙的方式都不一樣，還可以餵食升級',
+    '🎰 新增扭蛋：抽 6 種扭蛋限定刀光，和 4 把「雙屬性」扭蛋神刀（月影刀、熔岩雷刀、幸運草刀、花吹雪）',
+    '🎃 萬聖節活動（10/25～11/2）：南瓜會混在水果裡，切南瓜拿金幣和限定「南瓜刀光」',
+    '👋 新手教學：第一次玩會一步一步教你怎麼切',
+    '⚡ 背景畫得更省力，玩起來更順',
+    '🔒 好友碼只有本人能用，別人沒辦法冒用你的好友碼',
+    '🛠️ 修正：開遊戲後馬上輸入恢復碼有時會失敗；送禮失敗時會顯示正確的原因',
+  ],
   '1.9.4': [
     '🚀 Boss 戰更順：Boss 變色、擊殺技特效改用比較省力的畫法，手機比較不會卡',
     '🔋 火焰、毒霧、果汁漬和音效都減輕了負擔，玩久一點也比較不燙',
@@ -728,12 +755,14 @@ const HIT_RADIUS = 0.85, BOMB_HIT_RADIUS = 0.6;
 const TEST_MODE = new URLSearchParams(location.search).has('test');
 const SAVE_KEY = TEST_MODE ? 'fruitslash_test_v1' : 'fruitslash_save_v1';
 // 存檔格式版本：以後存檔欄位改名、搬家時，在 migrateSave 裡依版本號一步步轉換舊存檔，不會弄丟進度
-const SAVE_FMT = 1;
+const SAVE_FMT = 2;
 // cloud = { code: 恢復碼, name: 暱稱 }，只存在這支手機，不會上傳到 save 欄位裡
 const defaultSave = () => ({ fmt: SAVE_FMT, coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null, bossFirst: {}, checkin: null, seenVersion: null });
 function migrateSave(s) {
   // fmt 0（1.9.1 以前）→ 1：格式沒變，只是開始記版本號
   if (!s.fmt) s.fmt = 1;
+  // 1 → 2（2.0.0）：加入新手教學；已經玩過的老玩家直接略過
+  if (s.fmt < 2) { if (s.stats && s.stats.game > 0) s.tutorialDone = true; s.fmt = 2; }
   delete s.daily;
   return s;
 }
@@ -771,9 +800,11 @@ async function cloudInit() {
       const cred = await au.signInAnonymously(au.getAuth(fbApp)); CLOUD.uid = cred.user.uid;
     } catch (e) {}
     CLOUD.api = fs; CLOUD.db = fs.getFirestore(fbApp); CLOUD.ready = true; CLOUD.state = 'syncing';
-    publishProfile();
+    friendCode(); // 確保存檔裡有好友碼，下面同步上去後才能登記
     await cloudSync();
     if (CLOUD.state === 'syncing') CLOUD.state = 'ok'; // 還沒取暱稱時沒有東西要同步
+    publishProfile();
+    loadEventConfig();
   } catch (e) { CLOUD.state = 'offline'; }
   if (state === 'cloud') renderCloud();
 }
@@ -788,7 +819,7 @@ async function cloudSync() {
       name: cloud.name, save: data, version: VERSION, updatedAt: serverTimestamp(),
       stats: { coins: save.coins, best: save.best, unlocked: save.unlocked, cleared: Object.keys(save.cleared || {}).length },
     });
-    CLOUD.lastSync = Date.now(); CLOUD.state = 'ok';
+    CLOUD.lastSync = Date.now(); CLOUD.state = 'ok'; CLOUD.syncedFC = data.friendCode;
   } catch (e) {
     // 離線或寫太快被限速擋下：10 秒後自動再試
     CLOUD.state = 'offline';
@@ -801,18 +832,22 @@ async function cloudSync() {
 async function cloudRestore(input) {
   const code = input.trim().toUpperCase().replace(/\s+/g, '').replace(/^FRUIT(?!-)/, 'FRUIT-').replace(/^(FRUIT-[^-]{4})(?!-)/, '$1-');
   if (!CODE_RE.test(code)) throw new Error('恢復碼格式不對，應該像 FRUIT-ABCD-2345');
+  // 開遊戲時最多只等雲端 1 秒；如果還在連線中，這裡再多等一下
+  if (!CLOUD.ready && CLOUD.initP) await Promise.race([CLOUD.initP, new Promise(r => setTimeout(r, 8000))]);
   if (!CLOUD.ready) throw new Error('目前連不上雲端，請確認網路後再試一次');
   const { doc, getDoc } = CLOUD.api;
   const snap = await getDoc(doc(CLOUD.db, 'saves', code));
   if (!snap.exists()) throw new Error('找不到這組恢復碼，請再確認一次');
   const d = snap.data();
   save = migrateSave(Object.assign(defaultSave(), d.save, { cloud: { code, name: d.name }, codeSaved: true })); // 能輸入恢復碼就代表有存好
+  CLOUD.syncedFC = d.save && d.save.friendCode;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
   return d.name;
 }
 
 // ===== 畫布 =====
-const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const cv = document.getElementById('c');
+let ctx = cv.getContext('2d'); // 用 let：畫背景時會暫時換成背景圖層的畫筆
 const spriteCache = new Map(), artCache = new Map();
 let W = 0, H = 0, S = 0, DPR = 1;
 function resize() {
@@ -1182,14 +1217,16 @@ function buzz(ms) {
 const blade = () => (G && G.chal ? BLADES[0] : BLADES.find(b => b.id === save.equipped) || BLADES[0]);
 const bladeLvl = () => (G && G.chal ? 1 : save.levels[save.equipped] || 1);
 const dmgOf = (b, lvl) => +(b.power * (1 + (lvl - 1) * 0.5)).toFixed(1);
-const coinMult = () => blade().id === 'galaxy' ? 1.5 : blade().id === 'love' ? 1.25 : 1;
-const hitMul = () => blade().id === 'wind' ? 1.3 + 0.12 * bladeLvl() : 1;
+const coinMult = () => { const f = fxOf(blade()); return f.includes('galaxy') ? 1.5 : f.includes('love') ? 1.25 : 1; };
+const hitMul = () => fxOf(blade()).includes('wind') ? 1.3 + 0.12 * bladeLvl() : 1;
 const upgradeCost = (b, lvl) => Math.round((b.price * 0.3 + 60) * Math.pow(1.6, lvl - 1)); // 每升一級貴 1.6 倍
 // 刀的解鎖條件：req 1～5 = 要解鎖到第幾關，6 = 打通全部關卡
-const bladeUnlocked = b => !b.special && (b.req || 1) <= save.unlocked + (save.cleared[STAGES.length - 1] ? 1 : 0);
-const reqText = b => b.special ? '每日簽到 30 天獲得' : b.req > STAGES.length ? '打通全部關卡後解鎖' : `通過第 ${b.req - 1} 關後解鎖`;
+const bladeUnlocked = b => !b.special && !b.gacha && (b.req || 1) <= save.unlocked + (save.cleared[STAGES.length - 1] ? 1 : 0);
+const reqText = b => b.gacha ? '扭蛋限定（商店「🎰 扭蛋」）' : b.special ? '每日簽到 30 天獲得' : b.req > STAGES.length ? '打通全部關卡後解鎖' : `通過第 ${b.req - 1} 關後解鎖`;
 function effectText(b, lvl) {
   const d = `Boss 傷害 ${dmgOf(b, lvl)}`;
+  // 扭蛋刀：把兩種屬性的說明接起來
+  if (b.fx) return [d, ...b.fx.map(id => effectText({ id, power: b.power }, lvl).split('・').slice(1).join('・'))].filter(Boolean).join('・');
   switch (b.id) {
     case 'fire': return `${d}・爆炸範圍 ${14 + 3.5 * lvl | 0}%・燃燒 ${(0.4 * lvl).toFixed(1)}/秒`;
     case 'ice': return `${d}・${12 + 5 * lvl}% 機率慢動作 ${(1.2 + 0.3 * lvl).toFixed(1)} 秒`;
@@ -1222,7 +1259,8 @@ function newGame(stage) {
   G = { stage, st, score: 0, hearts: START_HEARTS + perkLvl('life'), coinsEarned: 0, coinFrac: 0, objs: [], pending: [], pieces: [], parts: [], splats: [],
     rings: [], bolts: [], texts: [], homers: [], slashes: [], beams: [], spawnT: 0.8, time: 0, timeScale: 1, slowT: 0,
     shake: 0, flash: 0, flashColor: '#fff', boss: null, bossIndex: 0, nextBoss: BOSS_AT[0], warnT: 0, overT: 0,
-    strokeCount: 0, trail: [], clouds: [], pillars: [], shield: 0, freezeT: 0, fin: null, bfx: null, clearT: 0, done: false };
+    strokeCount: 0, trail: [], clouds: [], pillars: [], shield: 0, freezeT: 0, fin: null, bfx: null, clearT: 0, done: false, ev: activeEvent(), pet: petForGame(),
+    tut: save.tutorialDone ? null : { t: 0, cut: false, bomb: false, miss: false, msg: '', msgT: 0 } };
   initBG(st.bg);
 }
 const gravity = () => H * 1.25;
@@ -1235,7 +1273,12 @@ function launch(kind, opts) {
   o.vy = -Math.sqrt(2 * g * peak);
   const tx = W * (0.25 + R() * 0.5);
   o.vx = (tx - o.x) / ((-o.vy / g) * 1.6);
-  if (kind === 'fruit') { const f = FRUITS[R() * FRUITS.length | 0]; o.f = f; o.art = f.id; o.r = r * (f.s || 1); }
+  if (kind === 'fruit') {
+    let f = FRUITS[R() * FRUITS.length | 0];
+    // 活動期間有些水果會換成活動水果（用 Math.random，不影響挑戰賽的固定順序；挑戰賽本來就沒有活動）
+    if (G.ev && Math.random() < G.ev.rate) { f = G.ev.fruit; o.ev = true; }
+    o.f = f; o.art = f.id; o.r = r * (f.s || 1);
+  }
   else if (kind === 'bomb') { o.art = 'bomb'; o.r = r * 0.95; }
   else if (kind === 'star') { o.e = '🌟'; o.r = r * 0.85; }
   else if (kind === 'heart') { o.e = '💗'; o.r = r * 0.85; }
@@ -1246,8 +1289,10 @@ function launch(kind, opts) {
 function pickKind(diff) {
   // 挑戰賽不算強化等級、也不看目前愛心數，雙方出現的東西才會完全一樣
   const pl = id => (G.chal ? 0 : perkLvl(id));
-  const r = R(), bomb = (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
-  const star = 0.03 + 0.012 * pl('star'), heart = 0.015 + 0.01 * pl('heart');
+  // 新手教學第一步（還沒切到第一顆水果）不出炸彈
+  const r = R(), bomb = G.tut && !G.tut.cut ? 0 : (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
+  const chick = G.pet && G.pet.id === 'chick' ? G.pet.lvl : 0; // 小雞：金星、愛心更常出現
+  const star = 0.03 + 0.012 * pl('star') + 0.01 * chick, heart = 0.015 + 0.01 * pl('heart') + 0.005 * chick;
   if (r < bomb) return 'bomb';
   if (r < bomb + star) return 'star';
   if (r < bomb + star + heart && (G.chal || G.hearts < MAX_HEARTS)) return 'heart';
@@ -1332,7 +1377,8 @@ function makeHalves(o, ang, off = 0, col = '#fff', force = 1) {
 }
 
 function addCoins(n) {
-  const v = n * (1 + 0.08 * perkLvl('coin')) + G.coinFrac, w = Math.floor(v + 1e-9);
+  const dog = G.pet && G.pet.id === 'dog' ? 0.1 + 0.05 * G.pet.lvl : 0; // 小狗狗：金幣加成
+  const v = n * (1 + 0.08 * perkLvl('coin') + dog) + G.coinFrac, w = Math.floor(v + 1e-9);
   G.coinFrac = v - w; save.coins += w; G.coinsEarned += w;
   if (w > 0) track('coins', w);
   return w;
@@ -1349,6 +1395,8 @@ function hitObj(o, ang, byEffect, off = 0) {
   G.score += 1;
   addCoins(coinMult());
   if (o.kind === 'fruit') track('fruit');
+  if (o.ev && G.ev) eventProgress(G.ev);
+  if (G.tut && !G.tut.cut && !byEffect) { G.tut.cut = true; tutSay('👍 很好！就是這樣切', 1.6); }
   if (!byEffect) G.strokeCount++; // 連斬只算手指真的劃到的，刀的特效連鎖不算
   if (o.kind === 'star') { track('star'); const c = addCoins(5 * coinMult()); text(o.x, o.y, `+${c} 💰`, '#ffd166'); sfx.coin(); }
   if (o.kind === 'heart') { G.hearts = Math.min(MAX_HEARTS, G.hearts + 1); text(o.x, o.y, '+❤️', '#ff5c8a'); sfx.coin(); }
@@ -1363,8 +1411,9 @@ function nearestFruit(x, y, maxD = Infinity) {
   return best;
 }
 
-function bladeEffect(o, ang = 0) {
-  const b = blade(), lvl = bladeLvl();
+function bladeEffect(o, ang = 0) { for (const id of fxOf(blade())) bladeEffectOne(id, o, ang); }
+function bladeEffectOne(id, o, ang) {
+  const b = { id }, lvl = bladeLvl();
   if (b.id === 'fire') {
     const R = S * (0.14 + 0.035 * lvl);
     ring(o.x, o.y, R, '#ff9f1c'); juice(o.x, o.y, '#ff6a00', 18, 1.3); sfx.boom();
@@ -1528,7 +1577,33 @@ function loseHeart() {
   if (G.hearts <= 0) G.overT = 1.0;
 }
 
+// ===== 新手教學（第一次玩才有）：切水果 → 小心炸彈 → 漏接會扣愛心 =====
+function tutSay(msg, sec) { if (G.tut) { G.tut.msg = msg; G.tut.msgT = sec; } }
+function tutTick(dt) {
+  const T = G.tut; if (!T) return;
+  T.t += dt; T.msgT -= dt;
+  if (!T.cut) { T.msg = '👆 用手指劃過水果，把它切開！'; T.msgT = 1; return; }
+  if (!T.bomb && T.msgT <= 0 && G.objs.some(o => o.kind === 'bomb' && !o.dead)) { T.bomb = true; tutSay('💣 黑色的是炸彈，不要切到它！', 4); }
+  if (!T.miss && T.msgT <= 0 && T.t > 25) { T.miss = true; tutSay('❤️ 水果掉到下面會扣一顆愛心，愛心用完就結束', 4); }
+  if (T.bomb && T.miss && T.msgT <= 0) { save.tutorialDone = true; persist(); G.tut = null; }
+}
+function drawTutorial() {
+  const T = G.tut; if (!T || T.msgT <= 0 || !T.msg) return;
+  const a = Math.min(1, T.msgT * 3), fs = S * 0.045;
+  ctx.save(); ctx.globalAlpha = a; ctx.font = `800 ${fs}px ${FONT},${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(T.msg).width + fs * 1.6, y = H * 0.24;
+  ctx.fillStyle = 'rgba(30,12,40,0.88)'; ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W / 2 - w / 2, y - fs, w, fs * 2, fs) : ctx.rect(W / 2 - w / 2, y - fs, w, fs * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.fillText(T.msg, W / 2, y + fs * 0.05); ctx.restore();
+}
 function missFruit(o) {
+  if (G.tut && !G.tut.miss) { G.tut.miss = true; tutSay('❤️ 水果掉到下面會扣一顆愛心，愛心用完就結束', 4); }
+  // 小兔兔：幫忙接住，不扣愛心
+  if (G.pet && G.pet.id === 'bunny' && G.pet.saves > 0 && !G.chal) {
+    G.pet.saves--; const pp = petPos();
+    text(Math.max(60, Math.min(W - 60, o.x)), H - S * 0.12, '🐰 接住了！', '#ffc8dd', 0.06, 1.2); emojiBurst(pp.x, pp.y, '💕', 3, S * 0.03);
+    return;
+  }
   const x = Math.max(30, Math.min(W - 30, o.x));
   text(x, H - S * 0.08, '✖', '#ff4d6d', 0.09);
   sfx.miss(); buzz(60);
@@ -1579,8 +1654,9 @@ function damageBoss(n, silent) {
   if (b.hp <= 0) { b.hp = 0; startFinisher(b); }
   updateBossBar();
 }
-function bossBladeEffect(b) {
-  const id = blade().id, lvl = bladeLvl(), dmg = dmgOf(blade(), lvl);
+function bossBladeEffect(b) { for (const id of fxOf(blade())) bossBladeEffectOne(id, b); }
+function bossBladeEffectOne(id, b) {
+  const lvl = bladeLvl(), dmg = dmgOf(blade(), lvl);
   if (id === 'fire') { b.burn = 2; b.burnDps = 0.4 * lvl; ring(b.x, b.y, b.r * 1.3, '#ff9f1c'); }
   else if (id === 'ice') { b.slow = 1 + 0.2 * lvl; emojiBurst(b.x, b.y, '❄️', 4, S * 0.035); }
   else if (id === 'sakura') { if (Math.random() < 0.5) addHomer(b.x + (Math.random() - 0.5) * b.r * 2, b.y + b.r * 1.5, true); }
@@ -1690,7 +1766,7 @@ const FIN_COLOR = { basic: '#ffffff', fire: '#ff9f1c', ice: '#e0fbfc', sakura: '
 function startFinisher(b) {
   const bl = blade();
   b.fin = true; b.windup = 0; b.plan = null; b.burn = 0;
-  G.fin = { id: bl.id, name: bl.finisher, icon: bl.icon, t: 0, dur: 2.7, brk: 1.25, broke: false, x: b.x, y: b.y, r: b.r, ev: 0, seed: Math.random() * 1e6 | 0 };
+  G.fin = { id: finOf(bl), name: bl.finisher, icon: bl.icon, t: 0, dur: 2.7, brk: 1.25, broke: false, x: b.x, y: b.y, r: b.r, ev: 0, seed: Math.random() * 1e6 | 0 };
   // 場上的炸彈全部無害化，不會在播特效時被炸到
   for (const o of G.objs) if (o.kind === 'bomb') { o.dead = true; burst(o.x, o.y, 'dot', 8, ['#555', '#999'], 0.4, 0.008, 0.5); }
   G.homers = [];
@@ -2179,9 +2255,24 @@ const BGDRAW = {
     }
   },
 };
+// 關卡背景很大一張、又是柔和的漸層和山丘：畫在一般解析度（不乘手機的高解析倍率）的另一張畫布上，
+// 而且每秒最多重畫 30 次，其餘的格直接貼上一次的結果。高解析手機上要畫的像素少很多
+const bgLayer = { c: document.createElement('canvas'), t: 0, key: '' };
 function drawStageBG(now) {
+  const L = bgLayer, key = `${W}x${H}|${BG.type}|${G && G.ev ? G.ev.id : ''}`;
+  if (L.key !== key) { L.key = key; L.c.width = Math.ceil(W); L.c.height = Math.ceil(H); L.t = 0; }
+  if (now - L.t >= 33) {
+    L.t = now;
+    const main = ctx; ctx = L.c.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    try { drawStageBGLayer(now); } finally { ctx = main; }
+  }
+  ctx.drawImage(L.c, 0, 0, W, H);
+}
+function drawStageBGLayer(now) {
   const dt = BG.last ? Math.min(0.05, (now - BG.last) / 1000) : 0; BG.last = now;
   BGDRAW[BG.type](now / 1000, dt);
+  if (G && G.ev && G.ev.id === 'halloween') drawHalloween(now / 1000);
   // 暗角：讓水果和文字比較清楚（畫在 1/4 大小的小圖上存起來，每格放大貼上，不用每格重算漸層）
   if (!vignette.c || vignette.w !== W || vignette.h !== H) {
     const c = vignette.c || document.createElement('canvas'), q = 4, g = c.getContext('2d');
@@ -2193,6 +2284,17 @@ function drawStageBG(now) {
   ctx.drawImage(vignette.c, 0, 0, W, H);
 }
 const vignette = { c: null, w: 0, h: 0 };
+// 萬聖節：背景蓋一層紫橘色的黃昏，再加幾隻飛來飛去的蝙蝠和一顆大月亮
+function drawHalloween(t) {
+  ctx.fillStyle = vgrad(0, H, [[0, 'rgba(40,0,70,0.72)'], [0.55, 'rgba(90,20,90,0.45)'], [1, 'rgba(255,110,0,0.28)']]); ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 0.85; ctx.fillStyle = '#ffe8a3'; circle(W * 0.86, H * 0.16, S * 0.07);
+  ctx.globalAlpha = 0.25; ctx.fillStyle = '#ffb347'; circle(W * 0.86, H * 0.16, S * 0.11); ctx.globalAlpha = 1;
+  for (let i = 0; i < 6; i++) {
+    const u = ((t * (0.05 + i * 0.012) + i * 0.17) % 1.3) - 0.15;
+    const x = u * W, y = H * (0.12 + 0.07 * i) + Math.sin(t * 2 + i * 1.7) * S * 0.03;
+    drawSprite('🦇', S * (0.035 + (i % 3) * 0.008), x, y, Math.sin(t * 6 + i) * 0.2, 0.8);
+  }
+}
 // 發光粒子（火焰、毒霧、影子）：每種顏色先畫一張漸層光點存起來，之後直接縮放貼上
 const glowCache = new Map();
 function glowSprite(color, edge) {
@@ -2381,6 +2483,7 @@ function drawBossFx(fx, now) {
 // ===== 更新 =====
 function update(rdt) {
   G.time += rdt;
+  tutTick(rdt);
   G.slowT -= rdt;
   G.freezeT -= rdt;
   const target = G.fin ? 0.22 : G.freezeT > 0 ? 0.03 : G.slowT > 0 ? 0.4 : 1;
@@ -2426,6 +2529,7 @@ function update(rdt) {
   G.objs = G.objs.filter(o => !o.dead);
 
   updateHomers(dt);
+  updatePet(dt);
   updateBeams(rdt);
   updateZones(dt, rdt);
   for (const p of G.pieces) { const pd = p.r > S * 0.1 ? rdt * 0.6 : dt; p.vy += g * pd; p.x += p.vx * pd; p.y += p.vy * pd; p.d += p.vd * pd; }
@@ -2814,6 +2918,7 @@ function render(now) {
   }
   ctx.globalAlpha = 1;
 
+  drawPet(now);
   drawTrail(now);
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -2827,6 +2932,7 @@ function render(now) {
   ctx.restore();
 
   if (f) drawFinisherOver(f, now);
+  drawTutorial();
   if (G.warnT > 0 && G.boss) {
     const a = Math.min(1, G.warnT) * (0.6 + 0.4 * Math.sin(now / 80));
     ctx.globalAlpha = a * 0.55; ctx.fillStyle = '#c1121f'; ctx.fillRect(0, H * 0.5 - S * 0.09, W, S * 0.18);
@@ -2905,7 +3011,7 @@ function drawTrail(now) {
       const col = src.rainbow ? `hsl(${(now / 3 + i * 30) % 360},100%,65%)` : src.colors[Math.min(src.colors.length - 1, Math.floor((1 - k) * src.colors.length))];
       ctx.strokeStyle = pass === 0 ? col : '#fff';
       ctx.globalAlpha = pass === 0 ? 0.25 + 0.55 * k : 0.9 * k;
-      ctx.lineWidth = pass === 0 ? base * (b.id === 'wind' ? 3.4 : 2.4) * k + 1 : base * 0.6 * k + 0.5;
+      ctx.lineWidth = pass === 0 ? base * (fxOf(b).includes('wind') ? 3.4 : 2.4) * k + 1 : base * 0.6 * k + 0.5;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke();
     }
   }
@@ -2919,7 +3025,7 @@ const TRAIL_COLORS = { fire: ['#ffd166', '#ff6a00', '#ff2e00'], ice: ['#ffffff',
 function trailParticle(x, y) {
   const sk = trailSkin();
   if (sk && sk.sparkle && Math.random() < 0.25) addPart({ x, y, vx: 0, vy: S * 0.05, life: 0.6, max: 0.6, e: '✨', size: S * 0.025, g: 0.1, rot: 0 });
-  const id = blade().id;
+  const id = fxOf(blade())[0];
   if (id === 'basic' || Math.random() > 0.5) return;
   if (id === 'love') { if (Math.random() < 0.3) addPart({ x, y, vx: (Math.random() - 0.5) * S * 0.2, vy: -S * 0.1, life: 0.6, max: 0.6, e: '💗', size: S * 0.03, g: -0.05, rot: 0 }); return; }
   if (id === 'sakura') { addPart({ x, y, vx: (Math.random() - 0.5) * S * 0.3, vy: S * 0.05, life: 0.7, max: 0.7, kind: 'petal', color: Math.random() < 0.5 ? '#ffc8dd' : '#ff8fab', size: S * 0.01, g: 0.15, rot: Math.random() * 6 }); return; }
@@ -2986,6 +3092,11 @@ const BLADE_ART = {
   candy:   { shape: 'straight', w: 0.062, pal: ['#ffffff', '#ffe5ec', '#ffafcc'], glow: '#ff8fab', pattern: 'stripes', guard: 'tsuba',  handle: '#70d6ff', gem: '#ffd670' },
   dragon:  { shape: 'broad',  w: 0.075, pal: ['#fff3b0', '#ffb703', '#9d0208'], glow: '#ff6a00', pattern: 'scales',   guard: 'dragon',  handle: '#6a040f', gem: '#d00000' },
   angel:   { shape: 'straight', w: 0.06, pal: ['#ffffff', '#fff8e7', '#f2c4d8'], glow: '#ffffff', pattern: 'feathers', guard: 'wings',  handle: '#f4e3b2', gem: '#4cc9f0' },
+  // 扭蛋刀
+  moon:    { shape: 'curved', w: 0.055, pal: ['#ffffff', '#c8d7ff', '#3a4a8a'], glow: '#a0c4ff', pattern: 'stars',    guard: 'tsuba',   handle: '#1b1f3b', gem: '#e0e7ff' },
+  lavabolt:{ shape: 'great',  w: 0.08,  pal: ['#fff3a0', '#ff7b00', '#7a0000'], glow: '#ff9f1c', pattern: 'lightning', guard: 'dragon', handle: '#2b0a0a', gem: '#ffd60a' },
+  clover:  { shape: 'leaf',   w: 0.065, pal: ['#f1ffe7', '#7bd389', '#1b5e3a'], glow: '#b7e4c7', pattern: 'hearts',   guard: 'heart',   handle: '#5a3a1a', gem: '#ffd166' },
+  blossom: { shape: 'katana', w: 0.047, pal: ['#ffffff', '#ffd6e5', '#7bbf6a'], glow: '#ffc8dd', pattern: 'sakura',   guard: 'tsuba',   handle: '#3a5a2a', gem: '#ff8fab' },
 };
 const bladeIconCache = {};
 function bladeIcon(b, px = 160) {
@@ -3180,6 +3291,9 @@ function goMenu() {
   const ttl = titleOf(); if (ttl) $('menu-sub').innerHTML += '<span id="menu-title-chip">' + ttl.icon + ' ' + ttl.name + '</span>';
   $('btn-missions').textContent = missionsClaimable() ? '🎯 每日任務 ❗' : '🎯 每日任務';
   $('btn-settings').textContent = needCodeReminder() ? '⚙️ 設定 ❗' : '⚙️ 設定';
+  const ev = activeEvent();
+  $('event-banner').classList.toggle('hidden', !ev);
+  if (ev) $('event-banner').textContent = eventBannerText(ev);
   $('boss-bar').classList.add('hidden');
   show('menu');
 }
@@ -3237,6 +3351,7 @@ function startGame(stage) { if (stage === 'endless') return startEndless(); audi
 function pauseGame() { if (state !== 'play') return; state = 'paused'; persist(); show('pause'); }
 function recordScore() {
   if (G.chal) return false;
+  if (G.tut && G.tut.cut) { save.tutorialDone = true; G.tut = null; } // 玩完一局就算學會了
   if (G.endless) { track('endlessBest', G.bossIndex); save.endlessBestScore = Math.max(save.endlessBestScore || 0, G.score); const rec = G.score > save.best; if (rec) save.best = G.score; return rec; }
   save.stageBest[G.stage] = Math.max(save.stageBest[G.stage] || 0, G.score);
   const rec = G.score > save.best;
@@ -3281,6 +3396,8 @@ function renderShop() {
   const list = $('shop-list'), det = $('shop-detail'); list.innerHTML = ''; det.innerHTML = '';
   if (shopTab === 'perks') return renderPerks(list, det);
   if (shopTab === 'trails') return renderTrails(list, det);
+  if (shopTab === 'pets') return renderPets(list, det);
+  if (shopTab === 'gacha') return renderGacha(list, det);
   if (!shopSel.blades) shopSel.blades = save.equipped;
   for (const b of BLADES) {
     const owned = !!save.owned[b.id], lvl = save.levels[b.id] || 1, locked = !owned && !bladeUnlocked(b), eq = save.equipped === b.id;
@@ -3436,7 +3553,8 @@ async function boot() {
   for (const f of FRUITS) { art('s', f.id, S * 0.075 * (f.s || 1)); art('f', f.id, S * 0.075 * (f.s || 1)); await wait(0); }
   step(80, '連線雲端存檔…');
   // 最多等 1 秒，網路慢就先進遊戲，雲端在背景繼續連線（進度先存在手機裡，連上後自動同步）
-  await Promise.race([cloudInit(), wait(1000)]);
+  CLOUD.initP = cloudInit();
+  await Promise.race([CLOUD.initP, wait(1000)]);
   step(100, '完成！');
   await wait(Math.max(200, 900 - (performance.now() - t0)));
   $('loading').classList.add('fade'); setTimeout(() => $('loading').classList.add('hidden'), 400);
@@ -3588,6 +3706,15 @@ function track(stat, amount = 1) {
 function openMissions() { state = 'missions'; renderMissions(); show('missions'); }
 function renderMissions() {
   const box = $('mission-list'); box.innerHTML = '';
+  // 活動進行中：最上面多一張活動卡（達成自動發獎）
+  const ev = activeEvent();
+  if (ev) {
+    const st = eventState(ev), last = ev.goals[ev.goals.length - 1], card = document.createElement('div');
+    card.className = 'mission' + (st.got.length === ev.goals.length ? ' done' : '');
+    card.innerHTML = `<div class="mt">${ev.icon} ${ev.name}活動：切${ev.item}</div><div class="bar"><div style="width:${Math.min(100, st.n / last.n * 100)}%"></div></div>
+      <div class="mp">${st.n} / ${last.n}・${ev.goals.map((g, i) => `${st.got.includes(i) ? '✅' : '⬜'} ${g.n} 顆：${goalText(ev, g)}`).join('　')}</div><div class="mr">到 ${+ev.to.slice(5, 7)}/${+ev.to.slice(8)}</div>`;
+    box.appendChild(card);
+  }
   for (const m of dailyMissions().list) {
     const done = m.progress >= m.n, card = document.createElement('div');
     card.className = 'mission' + (m.claimed ? ' claimed' : done ? ' done' : '');
@@ -3612,7 +3739,7 @@ const ACHIEVEMENTS = [
   { id: 's5', icon: '🧭', name: '冒險家', desc: '通過 5 個關卡', calc: () => Object.keys(save.cleared || {}).length, n: 5, reward: 1000 },
   { id: 's10', icon: '🪐', name: '宇宙霸主', desc: '通過全部 10 個關卡', calc: () => Object.keys(save.cleared || {}).length, n: 10, reward: 3000 },
   { id: 'k5', icon: '🗡️', name: '刀具收藏家', desc: '擁有 5 把刀', calc: () => Object.keys(save.owned || {}).length, n: 5, reward: 300 },
-  { id: 'k17', icon: '🏛️', name: '神兵大師', desc: '收集全部 17 把刀', calc: () => Object.keys(save.owned || {}).length, n: 17, reward: 5000 },
+  { id: 'k17', icon: '🏛️', name: '神兵大師', desc: '收集全部 17 把刀', calc: () => BLADES.filter(b => !b.gacha && save.owned && save.owned[b.id]).length, n: 17, reward: 5000 },
   { id: 'c5', icon: '⚡', name: '連斬高手', desc: '一刀連斬 5 顆水果', stat: 'maxCombo', n: 5, reward: 200 },
   { id: 'c10', icon: '🌪️', name: '無雙劍聖', desc: '一刀連斬 10 顆水果', stat: 'maxCombo', n: 10, reward: 800 },
   { id: 'd7', icon: '📅', name: '忠實玩家', desc: '累積簽到 7 天', calc: () => (save.checkin ? save.checkin.days : 0), n: 7, reward: 300 },
@@ -3676,6 +3803,15 @@ const TRAILS = [
   { id: 'void', name: '暗紫刀光', price: 2000, desc: '神秘的暗紫色刀光。', colors: ['#e0aaff', '#7b2cbf', '#240046'] },
   { id: 'neon', name: '霓虹刀光', price: 3000, desc: '青粉雙色的霓虹刀光。', colors: ['#ffffff', '#00f5d4', '#f15bb5'] },
   { id: 'star', name: '星光刀光', price: 5000, desc: '刀光後面會灑下星星。', colors: ['#ffffff', '#fff3b0', '#a0c4ff'], sparkle: true },
+  // 活動限定（不能買，活動獎勵）
+  { id: 'pumpkin', name: '南瓜刀光', event: '萬聖節', desc: '萬聖節活動限定：橘紫色的南瓜刀光。', colors: ['#ffd166', '#ff7b00', '#5a189a'] },
+  // 扭蛋限定（不能買，只能從扭蛋抽到）
+  { id: 'aurora', name: '極光刀光', gacha: true, desc: '扭蛋限定：綠紫交錯的極光。', colors: ['#ffffff', '#80ffdb', '#7400b8'] },
+  { id: 'lava', name: '熔岩刀光', gacha: true, desc: '扭蛋限定：滾燙的熔岩。', colors: ['#fff3b0', '#ff4d00', '#3d0000'] },
+  { id: 'mint', name: '薄荷刀光', gacha: true, desc: '扭蛋限定：清涼的薄荷綠。', colors: ['#ffffff', '#b9fbc0', '#38b000'] },
+  { id: 'sunset', name: '夕陽刀光', gacha: true, desc: '扭蛋限定：橘粉色的夕陽。', colors: ['#fff1e6', '#ff9a76', '#c04a82'] },
+  { id: 'frost', name: '糖霜刀光', gacha: true, desc: '扭蛋限定：白色糖霜會閃閃發亮。', colors: ['#ffffff', '#f8edeb', '#bde0fe'], sparkle: true },
+  { id: 'prism', name: '稜鏡刀光', gacha: true, desc: '扭蛋限定：比彩虹更炫的七彩稜鏡。', rainbow: true, sparkle: true, colors: ['#ff5c8a', '#ffd166', '#80ffdb', '#a0c4ff', '#e0aaff'] },
 ];
 const trailSkin = () => TRAILS.find(t => t.id === save.trail && save.trails && save.trails[t.id] && t.id !== 'default') || null;
 const shopTrailSel = { id: 'default' };
@@ -3684,7 +3820,7 @@ function renderTrails(list, det) {
   for (const t of TRAILS) {
     const owned = !!save.trails[t.id], eq = (save.trail || 'default') === t.id, tile = document.createElement('button');
     tile.className = 'tile' + (shopTrailSel.id === t.id ? ' sel' : '') + (eq ? ' eq' : '');
-    tile.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${t.colors.join(',')})"></div><div class="tn">${t.name}</div><div class="ts">${owned ? '已擁有' : '💰' + t.price}</div>${eq ? '<div class="tb">使用中</div>' : ''}`;
+    tile.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${t.colors.join(',')})"></div><div class="tn">${t.name}</div><div class="ts">${owned ? '已擁有' : t.gacha ? '🎰 扭蛋' : t.event ? '🎃 活動' : '💰' + t.price}</div>${eq ? '<div class="tb">使用中</div>' : ''}`;
     tile.onclick = () => { audio(); shopTrailSel.id = t.id; renderShop(); };
     list.appendChild(tile);
   }
@@ -3692,9 +3828,180 @@ function renderTrails(list, det) {
   const card = document.createElement('div'); card.className = 'card';
   card.innerHTML = `<div class="icon">✨</div><div class="name">${t.name}</div><div class="desc">${t.desc}</div><div class="fx"><div class="trail-preview" style="background:linear-gradient(90deg,transparent,${t.colors.join(',')},#fff)"></div></div><div class="actions"></div>`;
   const act = card.querySelector('.actions'), bt = document.createElement('button');
-  if (!owned) { bt.className = 'btn'; bt.textContent = `購買 💰${t.price}`; bt.disabled = save.coins < t.price; bt.onclick = () => { audio(); save.coins -= t.price; save.trails[t.id] = true; save.trail = t.id; persist(); sfx.win(); renderShop(); }; }
+  if (!owned && (t.gacha || t.event)) { bt.className = 'btn ghost'; bt.textContent = t.gacha ? '🎰 扭蛋限定' : `🎃 ${t.event}活動限定`; bt.disabled = true; }
+  else if (!owned) { bt.className = 'btn'; bt.textContent = `購買 💰${t.price}`; bt.disabled = save.coins < t.price; bt.onclick = () => { audio(); save.coins -= t.price; save.trails[t.id] = true; save.trail = t.id; persist(); sfx.win(); renderShop(); }; }
   else { bt.className = 'btn ' + (eq ? 'ghost' : 'alt'); bt.textContent = eq ? '使用中' : '裝備'; bt.disabled = eq; bt.onclick = () => { audio(); save.trail = t.id; persist(); sfx.coin(); renderShop(); }; }
   act.appendChild(bt); det.appendChild(card);
+}
+
+// ===== 扭蛋：抽扭蛋限定刀光、扭蛋限定刀（雙屬性），重複的會換成金幣或幫刀升級 =====
+const GACHA_COST = 800, GACHA_10_COST = 7200, GACHA_PITY = 30; // 連續 30 抽沒出刀，第 30 抽保證出刀
+const GACHA_POOL = [
+  ...TRAILS.filter(t => t.gacha).map(t => ({ kind: 'trail', id: t.id, w: 12 })), // 6 種刀光，各 12%
+  ...BLADES.filter(b => b.gacha).map(b => ({ kind: 'blade', id: b.id, w: 4 })),  // 4 把刀，各 4%
+  { kind: 'coins', n: 400, w: 12 },                                                // 12% 退回 400 金幣
+];
+let gachaLast = [];
+function gachaOnce() {
+  const g = save.gacha = Object.assign({ pity: 0, total: 0 }, save.gacha || {});
+  g.total++; g.pity++;
+  let pool = GACHA_POOL;
+  if (g.pity >= GACHA_PITY) pool = GACHA_POOL.filter(p => p.kind === 'blade');
+  let r = Math.random() * pool.reduce((a, p) => a + p.w, 0), pick = pool[0];
+  for (const p of pool) { if ((r -= p.w) < 0) { pick = p; break; } }
+  save.trails = Object.assign({ default: true }, save.trails || {});
+  if (pick.kind === 'blade') {
+    g.pity = 0;
+    const b = BLADES.find(x => x.id === pick.id);
+    if (!save.owned[b.id]) { save.owned[b.id] = true; save.levels[b.id] = 1; return { text: `${b.icon} ${b.name}（新刀！）`, rare: true }; }
+    if ((save.levels[b.id] || 1) < MAX_LEVEL) { save.levels[b.id] = (save.levels[b.id] || 1) + 1; return { text: `${b.icon} ${b.name} 升到 Lv.${save.levels[b.id]}`, rare: true }; }
+    save.coins += 3000; return { text: `${b.icon} ${b.name}（已滿級，換 3000 💰）`, rare: true };
+  }
+  if (pick.kind === 'trail') {
+    const t = TRAILS.find(x => x.id === pick.id);
+    if (!save.trails[t.id]) { save.trails[t.id] = true; return { text: `✨ ${t.name}（新！）` }; }
+    save.coins += 200; return { text: `✨ ${t.name}（重複，換 200 💰）` };
+  }
+  save.coins += pick.n; return { text: `💰 ${pick.n} 金幣` };
+}
+function gachaDraw(times) {
+  const cost = times === 10 ? GACHA_10_COST : GACHA_COST;
+  if (save.coins < cost) return;
+  save.coins -= cost;
+  gachaLast = Array.from({ length: times }, gachaOnce);
+  persist();
+  if (gachaLast.some(x => x.rare)) { sfx.win(); buzz([40, 30, 80]); } else sfx.coin();
+  renderShop();
+}
+function renderGacha(list, det) {
+  const pct = w => Math.round(w / GACHA_POOL.reduce((a, p) => a + p.w, 0) * 1000) / 10 + '%';
+  for (const p of GACHA_POOL) {
+    const tile = document.createElement('div'); tile.className = 'tile' + (p.kind === 'blade' ? '' : '');
+    if (p.kind === 'blade') { const b = BLADES.find(x => x.id === p.id), own = !!save.owned[b.id];
+      tile.innerHTML = `<img src="${bladeIcon(b)}" alt=""><div class="tn">${b.name}</div><div class="ts">${own ? 'Lv.' + (save.levels[b.id] || 1) : pct(p.w)}</div>`; if (!own) tile.classList.add('locked'); }
+    else if (p.kind === 'trail') { const t = TRAILS.find(x => x.id === p.id), own = !!(save.trails && save.trails[t.id]);
+      tile.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${t.colors.join(',')})"></div><div class="tn">${t.name}</div><div class="ts">${own ? '已擁有' : pct(p.w)}</div>`; }
+    else tile.innerHTML = `<div class="ti">💰</div><div class="tn">${p.n} 金幣</div><div class="ts">${pct(p.w)}</div>`;
+    list.appendChild(tile);
+  }
+  const g = Object.assign({ pity: 0, total: 0 }, save.gacha || {});
+  const card = document.createElement('div'); card.className = 'card';
+  card.innerHTML = `<div class="icon">🎰</div><div class="name">扭蛋機</div>
+    <div class="desc">可以抽到 6 種扭蛋限定刀光、4 把扭蛋限定的「雙屬性」神刀。抽到重複的刀會幫它升級，刀光重複換 200 金幣。</div>
+    <div class="fx">已經抽了 ${g.total} 次・再抽 ${GACHA_PITY - g.pity} 次內保證出刀</div><div class="actions"></div>
+    ${gachaLast.length ? `<div class="gacha-res" style="grid-column:1/-1">${gachaLast.map(x => `<span class="${x.rare ? 'rare' : ''}">${esc(x.text)}</span>`).join('')}</div>` : ''}`;
+  const act = card.querySelector('.actions');
+  for (const [n, cost, label] of [[1, GACHA_COST, '抽 1 次'], [10, GACHA_10_COST, '十連抽（9 折）']]) {
+    const bt = document.createElement('button'); bt.className = 'btn' + (n === 10 ? ' alt' : '');
+    bt.textContent = `${label} 💰${cost}`; bt.disabled = save.coins < cost; bt.onclick = () => { audio(); gachaDraw(n); };
+    act.appendChild(bt);
+  }
+  det.appendChild(card);
+}
+
+// ===== 寵物：陪你一起玩，各有不同的幫忙方式；可以餵食升級（最高 Lv.5）。挑戰賽不能帶寵物 =====
+const PETS = [
+  { id: 'cat', icon: '🐱', name: '小貓咪', price: 3000, desc: l => `每 ${9 - l} 秒撲向一顆水果，幫你切開` },
+  { id: 'dog', icon: '🐶', name: '小狗狗', price: 3000, desc: l => `切水果得到的金幣 +${10 + 5 * l}%` },
+  { id: 'chick', icon: '🐥', name: '小雞', price: 4000, desc: l => `金星出現率 +${l}%、補血愛心出現率 +${(l * 0.5).toFixed(1)}%` },
+  { id: 'bunny', icon: '🐰', name: '小兔兔', price: 5000, desc: l => `每局 ${l >= 4 ? 2 : 1} 次幫你接住漏掉的水果，不扣愛心` },
+  { id: 'panda', icon: '🐼', name: '貓熊', price: 8000, desc: l => `打 Boss 時每 ${(6 - 0.6 * l).toFixed(1)} 秒拍一下，造成 ${1 + 0.5 * l} 傷害` },
+];
+const petLvl = id => (save.pets && save.pets[id]) || 0;
+const feedCost = (p, lvl) => Math.round(p.price * 0.4 * Math.pow(1.6, lvl - 1));
+const shopPetSel = { id: 'cat' };
+function renderPets(list, det) {
+  save.pets = save.pets || {};
+  for (const p of PETS) {
+    const lvl = petLvl(p.id), tile = document.createElement('button');
+    tile.className = 'tile' + (shopPetSel.id === p.id ? ' sel' : '') + (save.pet === p.id ? ' eq' : '');
+    tile.innerHTML = `<div class="ti">${p.icon}</div><div class="tn">${p.name}</div><div class="ts">${lvl ? 'Lv.' + lvl : '💰' + p.price}</div>${save.pet === p.id ? '<div class="tb">一起玩</div>' : ''}`;
+    tile.onclick = () => { audio(); shopPetSel.id = p.id; renderShop(); };
+    list.appendChild(tile);
+  }
+  const p = PETS.find(x => x.id === shopPetSel.id), lvl = petLvl(p.id), eq = save.pet === p.id;
+  const card = document.createElement('div'); card.className = 'card' + (eq ? ' equipped' : '');
+  card.innerHTML = `<div class="icon">${p.icon}</div><div class="name">${p.name}<span class="lv">${lvl ? '★'.repeat(lvl) + '☆'.repeat(MAX_LEVEL - lvl) : ''}</span></div>
+    <div class="desc">${lvl ? '目前：' + p.desc(lvl) : p.desc(1)}</div><div class="fx">${lvl && lvl < MAX_LEVEL ? '餵食升級後：' + p.desc(lvl + 1) : lvl ? '已經長到最大了 ✨' : '挑戰賽時寵物會在旁邊休息，不會幫忙'}</div><div class="actions"></div>`;
+  const act = card.querySelector('.actions');
+  const mk = (label, cls, dis, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = label; b.disabled = dis; b.onclick = () => { audio(); fn(); }; act.appendChild(b); };
+  if (!lvl) mk(`領養 💰${p.price}`, '', save.coins < p.price, () => { save.coins -= p.price; save.pets[p.id] = 1; save.pet = p.id; persist(); sfx.win(); renderShop(); });
+  else {
+    mk(eq ? '讓牠休息' : '帶牠一起玩', eq ? 'ghost' : 'alt', false, () => { save.pet = eq ? null : p.id; persist(); sfx.coin(); renderShop(); });
+    if (lvl < MAX_LEVEL) { const c = feedCost(p, lvl); mk(`餵食 💰${c}`, '', save.coins < c, () => { save.coins -= c; save.pets[p.id] = lvl + 1; persist(); sfx.win(); emojiToast(p.icon); renderShop(); }); }
+  }
+  det.appendChild(card);
+}
+const emojiToast = icon => toast(`${icon} 吃飽了，長大了！`);
+// 遊戲中的寵物：newGame 時帶出場
+function petForGame() { const id = save.pet, lvl = petLvl(id); return id && lvl ? { id, lvl, t: id === 'cat' ? 9 - lvl : 6 - 0.6 * lvl, saves: lvl >= 4 ? 2 : 1, bob: 0 } : null; }
+const petPos = () => ({ x: S * 0.1, y: H - S * 0.1 });
+function updatePet(dt) {
+  const p = G.pet; if (!p || G.done || G.overT > 0) return;
+  p.bob += dt;
+  if (p.id === 'cat') {
+    p.t -= dt;
+    if (p.t <= 0) {
+      const cands = G.objs.filter(o => !o.dead && o.kind !== 'bomb' && o.y < H * 0.85);
+      if (cands.length) {
+        const o = cands[Math.random() * cands.length | 0], pp = petPos();
+        slash(pp.x, pp.y, o.x, o.y, '#ffd6a5', S * 0.01, 0.3, true); emojiBurst(o.x, o.y, '🐾', 3, S * 0.03);
+        hitObj(o, Math.atan2(o.y - pp.y, o.x - pp.x), true); p.t = 9 - p.lvl;
+      } else p.t = 0.5;
+    }
+  } else if (p.id === 'panda' && G.boss && !G.boss.fin && !G.boss.enter) {
+    p.t -= dt;
+    if (p.t <= 0) { p.t = 6 - 0.6 * p.lvl; emojiBurst(G.boss.x, G.boss.y, '🐾', 4, S * 0.04); damageBoss(1 + 0.5 * p.lvl); }
+  }
+}
+function drawPet(now) {
+  const p = G.pet; if (!p) return;
+  const pp = petPos(), hop = Math.abs(Math.sin(now / 260)) * S * 0.015;
+  ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(pp.x, pp.y + S * 0.04, S * 0.035, S * 0.01, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  drawSprite(PETS.find(x => x.id === p.id).icon, S * 0.075, pp.x, pp.y - hop);
+}
+
+// ===== 限時活動：依日期自動開始／結束；管理員也可以在後台用雲端開關提早開、延長或關閉 =====
+const EVENTS = {
+  halloween: { name: '萬聖節', icon: '🎃', from: '10-25', to: '11-02', item: '南瓜', fruit: { id: 'pumpkin', c: '#ff9f1c', s: 1.1 }, rate: 0.25,
+    goals: [{ n: 30, coins: 500 }, { n: 100, trail: 'pumpkin' }, { n: 300, coins: 2000 }] },
+};
+let EVENT_CFG = null; // 雲端 config/event：{ id, from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' } 強制開啟，或 { off: true } 強制關閉
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+async function loadEventConfig() {
+  try {
+    const s = await CLOUD.api.getDoc(CLOUD.api.doc(CLOUD.db, 'config', 'event'));
+    EVENT_CFG = s.exists() ? s.data() : null;
+    if (state === 'menu') goMenu();
+  } catch (e) {}
+}
+function activeEvent() {
+  const today = isoDay(new Date()), y = today.slice(0, 4);
+  if (EVENT_CFG && EVENT_CFG.off) return null;
+  if (EVENT_CFG && EVENTS[EVENT_CFG.id] && EVENT_CFG.from <= today && today <= EVENT_CFG.to)
+    return { ...EVENTS[EVENT_CFG.id], id: EVENT_CFG.id, key: EVENT_CFG.id + '-' + EVENT_CFG.from, to: EVENT_CFG.to };
+  for (const [id, e] of Object.entries(EVENTS)) if (y + '-' + e.from <= today && today <= y + '-' + e.to) return { ...e, id, key: id + '-' + y, to: y + '-' + e.to };
+  return null;
+}
+// 這次活動的進度（換一次活動就重新計算）
+function eventState(ev) {
+  if (!save.event || save.event.key !== ev.key) save.event = { key: ev.key, n: 0, got: [] };
+  return save.event;
+}
+function eventProgress(ev, n = 1) {
+  const st = eventState(ev); st.n += n;
+  ev.goals.forEach((g, i) => {
+    if (st.got.includes(i) || st.n < g.n) return;
+    st.got.push(i);
+    if (g.coins) { save.coins += g.coins; toast(`${ev.icon} 活動獎勵：切了 ${g.n} 顆${ev.item}，+${g.coins} 💰`); }
+    if (g.trail) { save.trails = Object.assign({ default: true }, save.trails || {}); save.trails[g.trail] = true; toast(`${ev.icon} 活動獎勵：獲得「${TRAILS.find(t => t.id === g.trail).name}」！到商店裝備吧`); }
+    try { sfx.win(); } catch (e) {}
+  });
+}
+const goalText = (ev, g) => g.coins ? `💰${g.coins}` : `✨ ${TRAILS.find(t => t.id === g.trail).name}`;
+function eventBannerText(ev) {
+  const st = eventState(ev), next = ev.goals.find((g, i) => !st.got.includes(i));
+  return `${ev.icon} ${ev.name}活動中（到 ${+ev.to.slice(5, 7)}/${+ev.to.slice(8)}）：已切 ${st.n} 顆${ev.item}` + (next ? `・切到 ${next.n} 顆送 ${goalText(ev, next)}` : '・獎勵全部拿到了！');
 }
 
 // ===== 無盡模式：Boss 一直出現，每打倒一隻就換到下一個關卡的場景，越來越強 =====
@@ -3703,6 +4010,7 @@ $('btn-endless').onclick = () => { if (save.cleared[0]) startEndless(); };
 
 // 主選單的次要按鈕
 $('btn-missions').onclick = () => { audio(); openMissions(); };
+$('event-banner').onclick = () => { audio(); openMissions(); };
 $('btn-missions-back').onclick = () => goMenu();
 $('btn-ach').onclick = () => { audio(); openAch(); };
 $('btn-ach-back').onclick = () => goMenu();
@@ -3739,9 +4047,25 @@ function friendCode() {
 }
 const myName = () => (save.cloud && save.cloud.name) || '玩家';
 const socialOk = () => CLOUD.ready && CLOUD.uid;
+// 向雲端登記「這組好友碼是我的」（規則會核對雲端存檔裡的好友碼，別人冒用不了）。換手機後會自動重新登記
+async function claimFriendCode() {
+  const code = friendCode();
+  if (save.codeOwner === CLOUD.uid + '|' + code) return true;
+  if (!save.cloud || !save.cloud.code) return false;
+  // 雲端存檔要先有這組好友碼（正在同步就等它完成）
+  for (let i = 0; i < 25 && CLOUD.busy; i++) await new Promise(r => setTimeout(r, 200));
+  if (CLOUD.syncedFC !== code) { await cloudSync(); if (CLOUD.syncedFC !== code) return false; }
+  try {
+    const { doc, setDoc } = CLOUD.api;
+    await setDoc(doc(CLOUD.db, 'codes', code), { uid: CLOUD.uid, rc: save.cloud.code });
+    save.codeOwner = CLOUD.uid + '|' + code; persist();
+    return true;
+  } catch (e) { return false; }
+}
 // 自己的公開資料：排行榜和好友頁會讀這份
 async function publishProfile() {
   if (!socialOk() || !save.cloud) return;
+  if (!(await claimFriendCode())) return;
   const { doc, setDoc, serverTimestamp } = CLOUD.api, t = titleOf();
   try {
     await setDoc(doc(CLOUD.db, 'profiles', CLOUD.uid), {
@@ -3843,12 +4167,17 @@ async function addFriend() {
 // ----- 禮物：每位好友每天可以送一次，對方收到 100 金幣 -----
 const GIFT_COINS = 100;
 async function sendGift(code) {
-  const { doc, setDoc, serverTimestamp } = CLOUD.api, me = friendCode(), day = todayKey();
+  const { doc, setDoc, getDoc, serverTimestamp } = CLOUD.api, me = friendCode(), day = todayKey(), ref = doc(CLOUD.db, 'gifts', `${me}_${code}_${day}`);
+  const markSent = () => { save.giftSent = save.giftSent || {}; save.giftSent[code] = day; persist(); };
   try {
-    await setDoc(doc(CLOUD.db, 'gifts', `${me}_${code}_${day}`), { from: me, fromName: myName(), to: code, day, at: serverTimestamp() });
-    save.giftSent = save.giftSent || {}; save.giftSent[code] = day; persist();
-    $('friend-msg').textContent = '🎁 禮物已送出！'; sfx.coin();
-  } catch (e) { save.giftSent = save.giftSent || {}; save.giftSent[code] = day; $('friend-msg').textContent = '今天已經送過這位好友了'; }
+    await setDoc(ref, { from: me, fromName: myName(), to: code, day, at: serverTimestamp() });
+    markSent(); $('friend-msg').textContent = '🎁 禮物已送出！'; sfx.coin();
+  } catch (e) {
+    // 送不出去：先看是不是今天已經送過（禮物還在），不是的話就是網路或登記問題
+    let sent = false; try { sent = (await getDoc(ref)).exists(); } catch (e2) {}
+    if (sent) { markSent(); $('friend-msg').textContent = '今天已經送過這位好友了'; }
+    else $('friend-msg').textContent = '⚠️ 禮物沒送出去，請確認網路後再試一次';
+  }
   renderFriends();
 }
 async function claimGifts() {
@@ -3864,7 +4193,7 @@ function startChallenge(c) {
   audio();
   c.seed = c.seed || (crypto.getRandomValues(new Uint32Array(1))[0] % 2147483646) + 1;
   curStage = 0; newGame(0);
-  G.chal = c; G.rand = rng(c.seed); G.hearts = 3; G.nextBoss = Infinity;
+  G.chal = c; G.rand = rng(c.seed); G.hearts = 3; G.nextBoss = Infinity; G.ev = null; G.pet = null; G.tut = null;
   state = 'play'; show(null); track('game'); updateHUD();
 }
 async function challengeEnd() {
