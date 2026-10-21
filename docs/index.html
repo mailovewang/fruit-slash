@@ -297,7 +297,8 @@
   @media (orientation: landscape) and (max-height: 600px) { .stage { padding: 6px 4px; } .stage .s-icon { font-size: 24px; } #stages { gap: 8px; } }
   #share-view { position: fixed; inset: 0; z-index: 50; background: rgba(10,4,14,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; }
   #share-view img { max-width: min(92vw, 520px); max-height: 72vh; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.6); user-select: auto; -webkit-user-select: auto; -webkit-touch-callout: default; touch-action: auto; }
-  #share-view p { margin: 0; color: var(--muted); font-size: 14px; }
+  #share-view p { margin: 0; color: var(--muted); font-size: 14px; text-align: center; }
+  #share-view a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
   /* 主選單左下角的寵物 */
   #menu-pet { position: fixed; left: calc(env(safe-area-inset-left) + 14px); bottom: calc(env(safe-area-inset-bottom) + 10px); border: none; background: none;
     display: flex; flex-direction: column; align-items: center; cursor: pointer; animation: petbob 1.4s ease-in-out infinite; padding: 0; color: #fff; font: inherit; }
@@ -324,7 +325,7 @@
 <div id="scroll-hint" class="hidden">⬇ 往下滑還有更多</div>
 <button id="update-bar" class="hidden"></button>
 <div id="toast" class="hidden"></div>
-<div id="share-view" class="hidden"><img id="share-img" alt="成績圖"><p>長按圖片可以儲存，或截圖傳給朋友</p><button class="btn ghost" id="btn-share-close">關閉</button></div>
+<div id="share-view" class="hidden"><img id="share-img" alt="成績圖"><p id="share-tip"></p><div class="btn-row"><a class="btn" id="btn-share-dl" download>⬇ 下載圖片</a><button class="btn ghost" id="btn-share-close">關閉</button></div></div>
 
 <div id="loading">
   <h1 class="title">寶貝切切樂</h1>
@@ -682,9 +683,13 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '2.1.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '2.1.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '2.1.1': [
+    '📤 修正分享成績：新版 APK（1.4）按分享會直接跳出手機的分享選單，可以傳到 LINE、IG',
+    '⬇ 用瀏覽器玩的話，沒辦法直接分享時會出現「下載圖片」按鈕',
+  ],
   '2.1.0': [
     '🍌 新增特殊香蕉：冰凍（時間變慢）、狂熱（分數 ×2、水果變多）、金幣（金幣 ×2）',
     '🔥 一刀連斬 5 顆會有慢動作；刀劃過水果正中間是「完美切」，多加 1 分',
@@ -4295,11 +4300,26 @@ async function shareResult() {
   if (!lastResult) return;
   audio();
   const c = await makeShareCard(lastResult), text = `我在${CONFIG.title}拿到 ${lastResult.score} 分！一起來切水果 🍉 https://mailovewang.github.io/fruit-slash/`;
+  const dataUrl = c.toDataURL('image/png');
+  // APK（1.4 以上）：先把圖存到手機的暫存資料夾，再叫出 Android 的分享選單（LINE、IG…）
+  if (NATIVE.Share && NATIVE.Filesystem) {
+    try {
+      const w = await NATIVE.Filesystem.writeFile({ path: 'fruit-slash-score.png', data: dataUrl.split(',')[1], directory: 'CACHE' });
+      await NATIVE.Share.share({ title: CONFIG.title, text, files: [w.uri], dialogTitle: '分享成績' });
+      return;
+    } catch (e) { if (/cancel/i.test(String(e && e.message))) return; } // 玩家自己取消分享
+  }
+  // 手機瀏覽器：直接分享圖片檔
   try {
     const blob = await new Promise(res => c.toBlob(res, 'image/png')), file = new File([blob], 'fruit-slash-score.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
-  } catch (e) { if (e && e.name === 'AbortError') return; } // 玩家自己取消分享
-  $('share-img').src = c.toDataURL('image/png'); $('share-view').classList.remove('hidden');
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // 都不行：顯示成績圖，附「下載圖片」按鈕
+  $('share-img').src = dataUrl;
+  const a = $('btn-share-dl'); a.href = dataUrl; a.download = `寶貝切切樂-${lastResult.score}分.png`;
+  $('share-tip').textContent = window.Capacitor ? '這個版本的 APK 不能直接分享，請更新到最新版 APK，或截圖傳給朋友' : '按「下載圖片」存到手機，再傳給朋友';
+  $('btn-share-dl').classList.toggle('hidden', !!window.Capacitor); // APK 裡下載連結沒有作用，就不顯示
+  $('share-view').classList.remove('hidden');
 }
 $('btn-share-over').onclick = shareResult;
 $('btn-share-clear').onclick = shareResult;
@@ -4624,6 +4644,7 @@ const BACK_BTN = { paused: 'btn-resume', shop: 'btn-shop-back', stages: 'btn-sta
   checkin: 'btn-checkin-back', missions: 'btn-missions-back', ach: 'btn-ach-back', friends: 'btn-friends-back', rank: 'btn-rank-back',
   chalres: 'btn-chal-back', over: 'btn-over-menu', clear: 'btn-clear-menu', whatsnew: 'btn-wn-ok' };
 if (NATIVE.App) NATIVE.App.addListener('backButton', () => {
+  if (!$('share-view').classList.contains('hidden')) return $('share-view').classList.add('hidden');
   if (state === 'play') return pauseGame();
   if (state === 'menu') { persist(); cloudSync(); return NATIVE.App.exitApp(); }
   const id = BACK_BTN[state]; if (id) $(id).click();
