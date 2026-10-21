@@ -52,6 +52,14 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
+    <h2 style="font-size:17px;margin:24px 0 8px">🏆 排行榜玩家（公開資料）</h2>
+    <p id="pmsg" style="color:var(--muted);font-size:13px;margin:0 0 8px">「移除」：從排行榜拿掉（玩家下次開遊戲會重新出現）。「封鎖」：拿掉而且不能再上榜、送禮、發挑戰。</p>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>暱稱</th><th>好友碼</th><th>最高分</th><th>無盡</th><th>通關</th><th>最後更新</th><th></th></tr></thead>
+        <tbody id="prows"></tbody>
+      </table>
+    </div>
   </div>
 </main>
 <script src="firebase-config.js"></script>
@@ -66,7 +74,7 @@ if (!cfg || !cfg.apiKey) {
 } else {
   const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
   const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
-  const { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+  const { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc, setDoc, serverTimestamp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
   const app = initializeApp(cfg);
   if (window.RECAPTCHA_SITE_KEY) {
     const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app-check.js`);
@@ -94,6 +102,7 @@ if (!cfg || !cfg.apiKey) {
       const snap = await getDocs(query(collection(db, 'saves'), orderBy('updatedAt', 'desc')));
       rows = snap.docs.map(d => ({ code: d.id, ...d.data() }));
       $('msg').textContent = ''; $('list').hidden = false; render();
+      loadProfiles();
     } catch (e) {
       $('list').hidden = true;
       const uid = auth.currentUser && auth.currentUser.uid;
@@ -130,7 +139,48 @@ if (!cfg || !cfg.apiKey) {
     }
   }
 
-  onAuthStateChanged(auth, user => {
+  // ===== 排行榜玩家管理：移除、封鎖 =====
+  let profiles = [], bannedSet = new Set();
+  async function loadProfiles() {
+    try {
+      const [ps, bs] = await Promise.all([getDocs(query(collection(db, 'profiles'), orderBy('best', 'desc'))), getDocs(collection(db, 'banned'))]);
+      profiles = ps.docs.map(d => ({ uid: d.id, ...d.data() }));
+      bannedSet = new Set(bs.docs.map(d => d.id));
+      renderProfiles();
+    } catch (e) { $('pmsg').textContent = '排行榜讀取失敗：' + e.message; }
+  }
+  // 按兩次才會執行（第一次變紅色「確定？」，3 秒內再按一次）
+  function armedButton(label, confirmLabel, fn) {
+    const b = document.createElement('button'); b.className = 'copy ghost'; b.textContent = label;
+    let armed = false;
+    b.onclick = async () => {
+      if (!armed) { armed = true; b.textContent = confirmLabel; b.style.background = '#c1121f'; setTimeout(() => { armed = false; b.textContent = label; b.style.background = ''; }, 3000); return; }
+      b.disabled = true;
+      try { await fn(); } catch (e) { b.textContent = '失敗'; $('pmsg').textContent = '操作失敗：' + e.message; }
+    };
+    return b;
+  }
+  function renderProfiles() {
+    const tb = $('prows'); tb.innerHTML = '';
+    for (const p of profiles) {
+      const tr = document.createElement('tr'), t = p.updatedAt ? p.updatedAt.toDate().toLocaleString('zh-TW', { hour12: false }) : '—';
+      [p.name || '—', p.code || '—', p.best ?? 0, p.endless ?? 0, p.cleared ?? 0, t].forEach((v, i) => {
+        const td = document.createElement('td'); td.textContent = v; if (i === 1) td.className = 'code'; if (i >= 2 && i <= 4) td.className = 'num'; tr.appendChild(td);
+      });
+      const td = document.createElement('td');
+      td.appendChild(armedButton('移除', '確定移除？', async () => { await deleteDoc(doc(db, 'profiles', p.uid)); profiles = profiles.filter(x => x !== p); renderProfiles(); }));
+      td.appendChild(armedButton('封鎖', '確定封鎖？', async () => {
+        await setDoc(doc(db, 'banned', p.uid), { name: p.name || '', code: p.code || '', best: p.best ?? 0, at: serverTimestamp() });
+        await deleteDoc(doc(db, 'profiles', p.uid)); profiles = profiles.filter(x => x !== p); renderProfiles();
+      }));
+      tr.appendChild(td); tb.appendChild(tr);
+    }
+    $('pmsg').textContent = `共 ${profiles.length} 位上榜・已封鎖 ${bannedSet.size} 位。「移除」：從排行榜拿掉（玩家下次開遊戲會重新出現）。「封鎖」：拿掉而且不能再上榜、送禮、發挑戰。`;
+  }
+
+  onAuthStateChanged(auth, u => {
+    // 同一個網站的遊戲會自動匿名登入；匿名身分不能管理，當成沒登入，顯示 Google 登入按鈕
+    const user = u && !u.isAnonymous ? u : null;
     $('login').hidden = !!user; $('logout').hidden = !user;
     $('who').textContent = user ? `已登入：${user.displayName || ''}` : '';
     if (user) load(); else { $('list').hidden = true; $('msg').textContent = '請用管理員的 Google 帳號登入。'; }

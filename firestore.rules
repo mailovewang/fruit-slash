@@ -37,15 +37,32 @@ service cloud.firestore {
     function shortStr(v, n) { return v is string && v.size() <= n; }
     function num(v, n) { return v is int && v >= 0 && v <= n; }
 
+    // 被管理員封鎖的玩家（文件 ID = uid）：不能再上排行榜、送禮、發挑戰
+    function notBanned() { return !exists(/databases/$(database)/documents/banned/$(request.auth.uid)); }
+    match /banned/{uid} {
+      allow read, write: if isAdmin();
+    }
+
+    function validProfile() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['code', 'name', 'title', 'blade', 'best', 'endless', 'cleared', 'updatedAt'])
+        && fcode(d.code) && shortStr(d.name, 40) && shortStr(d.title, 40) && shortStr(d.blade, 20)
+        && num(d.best, 99999) && num(d.endless, 999) && num(d.cleared, 50)
+        && d.updatedAt == request.time;
+    }
+
     // 公開資料（排行榜、好友用），文件 ID 是匿名登入的 uid，只有本人能改
+    // 防作弊：新上榜最高 10000 分／無盡 100 隻；之後每次最多加 5000 分／30 隻，而且 5 秒內只能改一次
+    //（2026-10-22 全服最高 3153 分、無盡 27 隻，正常玩不會碰到上限）
     match /profiles/{uid} {
       allow read: if true;
-      allow write: if authed() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['code', 'name', 'title', 'blade', 'best', 'endless', 'cleared', 'updatedAt'])
-        && fcode(request.resource.data.code) && shortStr(request.resource.data.name, 40)
-        && shortStr(request.resource.data.title, 40) && shortStr(request.resource.data.blade, 20)
-        && num(request.resource.data.best, 99999) && num(request.resource.data.endless, 999) && num(request.resource.data.cleared, 50)
-        && request.resource.data.updatedAt == request.time;
+      allow create: if authed() && request.auth.uid == uid && notBanned() && validProfile()
+        && request.resource.data.best <= 10000 && request.resource.data.endless <= 100;
+      allow update: if authed() && request.auth.uid == uid && notBanned() && validProfile()
+        && request.time > resource.data.updatedAt + duration.value(5, 's')
+        && request.resource.data.best <= resource.data.best + 5000
+        && request.resource.data.endless <= resource.data.endless + 30;
+      allow delete: if isAdmin();
     }
 
     // 目前登入的人在 profiles 裡登記的好友碼（用來確認「收件人是不是本人」）
@@ -56,7 +73,8 @@ service cloud.firestore {
       allow read: if authed();
       // 只有收件人本人可以領取（刪除）禮物
       allow delete: if authed() && resource.data.to == myCode();
-      allow create: if authed()
+      // 只能用自己的好友碼送（不能冒充別人）
+      allow create: if authed() && notBanned() && request.resource.data.from == myCode()
         && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'day', 'at'])
         && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
         && shortStr(request.resource.data.day, 12) && request.resource.data.at == request.time
@@ -66,15 +84,16 @@ service cloud.firestore {
     // 挑戰賽：建立時還沒有對手分數；對手只能填一次自己的分數
     match /challenges/{id} {
       allow read: if authed();
-      allow create: if authed()
+      // 只能用自己的好友碼發挑戰；60 秒挑戰分數上限 1000
+      allow create: if authed() && notBanned() && request.resource.data.from == myCode()
         && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'seed', 'score', 'reply', 'replyName', 'at'])
         && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
-        && num(request.resource.data.seed, 2147483647) && num(request.resource.data.score, 99999)
+        && num(request.resource.data.seed, 2147483647) && num(request.resource.data.score, 1000)
         && request.resource.data.reply == null && request.resource.data.replyName == null && request.resource.data.at == request.time;
       // 只有被挑戰的人本人可以填自己的分數
       allow update: if authed() && resource.data.reply == null && resource.data.to == myCode()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'replyName'])
-        && num(request.resource.data.reply, 99999) && shortStr(request.resource.data.replyName, 40);
+        && num(request.resource.data.reply, 1000) && shortStr(request.resource.data.replyName, 40);
       allow delete: if isAdmin();
     }
   }

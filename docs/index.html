@@ -344,6 +344,7 @@
   <h2>歡迎！先取個暱稱吧 🍉</h2>
   <p class="stat">暱稱會和你的恢復碼一起存到雲端，<br>忘記恢復碼時，可以報暱稱請管理員幫你查。</p>
   <input class="field" id="name-input" maxlength="12" placeholder="你的暱稱" autocomplete="off">
+  <p class="stat" id="name-msg"></p>
   <div class="btn-row">
     <button class="btn" id="btn-name-ok">開始</button>
     <button class="btn ghost" id="btn-name-restore">🔑 我有恢復碼</button>
@@ -359,6 +360,7 @@
     <p class="stat" id="cloud-status"></p>
   </div>
   <div class="btn-row">
+    <button class="btn" id="btn-code-saved">✅ 我已經存好恢復碼了</button>
     <button class="btn alt" id="btn-copy-code">📋 複製恢復碼</button>
     <button class="btn ghost" id="btn-restore-open">🔑 輸入恢復碼</button>
   </div>
@@ -642,9 +644,14 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.9.2'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '1.9.3'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.9.3': [
+    '🏆 排行榜防作弊：分數不合理的紀錄不會上榜，管理員也可以移除或封鎖作弊的玩家',
+    '🔑 恢復碼提醒：還沒確認存好恢復碼的話，設定按鈕會出現 ❗（換手機時要靠它找回進度）',
+    '🙊 暱稱會出現在排行榜上，不雅的暱稱不能使用',
+  ],
   '1.9.2': [
     '🍉 切水果的判定放寬：劃過水果邊緣也算切到（炸彈維持原本的判定，不會更容易誤炸）',
     '🔋 更省電：在選單、暫停、商店時不再全速重畫畫面，手機比較不會發燙',
@@ -795,7 +802,7 @@ async function cloudRestore(input) {
   const snap = await getDoc(doc(CLOUD.db, 'saves', code));
   if (!snap.exists()) throw new Error('找不到這組恢復碼，請再確認一次');
   const d = snap.data();
-  save = migrateSave(Object.assign(defaultSave(), d.save, { cloud: { code, name: d.name } }));
+  save = migrateSave(Object.assign(defaultSave(), d.save, { cloud: { code, name: d.name }, codeSaved: true })); // 能輸入恢復碼就代表有存好
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
   return d.name;
 }
@@ -3119,6 +3126,7 @@ function goMenu() {
   $('menu-best').textContent = save.best; $('menu-coins').textContent = save.coins;
   const ttl = titleOf(); if (ttl) $('menu-sub').innerHTML += '<span id="menu-title-chip">' + ttl.icon + ' ' + ttl.name + '</span>';
   $('btn-missions').textContent = missionsClaimable() ? '🎯 每日任務 ❗' : '🎯 每日任務';
+  $('btn-settings').textContent = needCodeReminder() ? '⚙️ 設定 ❗' : '⚙️ 設定';
   $('boss-bar').classList.add('hidden');
   show('menu');
 }
@@ -3313,6 +3321,7 @@ function renderCloud() {
   $('cloud-name').textContent = c ? c.name : '（還沒取暱稱）';
   $('cloud-code').textContent = c ? c.code : '—';
   $('btn-copy-code').classList.toggle('hidden', !c);
+  $('btn-code-saved').classList.toggle('hidden', !c || !!save.codeSaved);
   const t = CLOUD.lastSync ? new Date(CLOUD.lastSync).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
   $('cloud-status').textContent = {
     off: '⚠️ 雲端還沒設定好，目前進度只存在這支手機',
@@ -3321,14 +3330,20 @@ function renderCloud() {
     ok: `✅ 已同步到雲端（${t}）`,
   }[CLOUD.state] || '';
 }
+// 暱稱會出現在公開的排行榜上，擋掉常見的髒話（比對時忽略空白、大小寫和常見的替代符號）
+const BAD_WORDS = ['幹你', '幹妳', '幹林', '幹拎', '靠北', '靠杯', '操你', '草你', '屌', '雞巴', '機掰', '雞掰', '婊', '賤人', '去死', '智障', '白癡', '白痴', '腦殘', '垃圾', '王八', '三小', 'fuck', 'fuk', 'shit', 'bitch', 'dick', 'cunt', 'nigg', 'porn', 'sex'];
+const badName = n => { const s = n.toLowerCase().replace(/[\s._\-*@!1|0$3]/g, c => ({ '1': 'i', '|': 'i', '0': 'o', '$': 's', '3': 'e', '@': 'a', '!': 'i' })[c] || ''); return BAD_WORDS.some(w => s.includes(w)); };
+const cleanName = n => n.replace(/[\u0000-\u001f\u007f<>]/g, '').trim();
 $('btn-name-ok').onclick = () => {
   audio();
-  const name = $('name-input').value.trim().slice(0, 12) || '玩家';
+  const name = cleanName($('name-input').value).slice(0, 12) || '玩家';
+  if (badName(name)) { $('name-msg').textContent = '❌ 這個暱稱不太適合放在排行榜上，換一個吧'; return; }
   save.cloud = { code: newCode(), name };
   persist(); cloudSync();
   openCloud('menu'); // 先讓玩家看到恢復碼，提醒截圖
 };
 $('btn-name-restore').onclick = () => { audio(); openCloud('nameset'); };
+$('btn-code-saved').onclick = () => { audio(); save.codeSaved = true; persist(); renderCloud(); toast('👍 好的！換手機時用恢復碼就能找回進度'); };
 $('btn-cloud-back').onclick = () => { if (cloudReturn === 'nameset' && !(save.cloud && save.cloud.name)) openNameSet(); else goMenu(); };
 $('btn-copy-code').onclick = async () => {
   const code = save.cloud && save.cloud.code; if (!code) return;
@@ -3429,7 +3444,10 @@ function renderSettings() {
   $('set-music').textContent = `🎵 背景音樂：${s.music ? '開' : '關'}`;
   $('set-sfx').textContent = `🔊 音效：${s.sfx ? '開' : '關'}`;
   $('set-vibe').textContent = `📳 震動：${s.vibe ? '開' : '關'}`;
+  $('btn-settings-cloud').textContent = needCodeReminder() ? '☁️ 雲端存檔・恢復碼 ❗ 還沒確認存好' : '☁️ 雲端存檔・恢復碼';
 }
+// 有恢復碼但玩家還沒按過「我已經存好了」：在設定按鈕上加 ❗ 提醒（換手機時沒有恢復碼就找不回進度）
+const needCodeReminder = () => !!(save.cloud && save.cloud.code && !save.codeSaved);
 for (const k of ['music', 'sfx', 'vibe']) $('set-' + k).onclick = () => { audio(); const s = settings(); s[k] = !s[k]; persist(); renderSettings(); };
 $('btn-settings-back').onclick = () => { if (settingsReturn === 'pause') { state = 'paused'; show('pause'); } else goMenu(); };
 $('btn-settings').onclick = () => { audio(); openSettings('menu'); };
