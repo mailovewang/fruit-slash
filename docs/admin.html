@@ -43,6 +43,7 @@
     <div class="bar">
       <input id="q" placeholder="搜尋暱稱或恢復碼">
       <button id="reload" class="ghost">重新整理</button>
+      <button id="backup">⬇ 下載全部存檔備份</button>
       <span id="count"></span>
     </div>
     <div class="wrap">
@@ -77,6 +78,15 @@ if (!cfg || !cfg.apiKey) {
   $('logout').onclick = () => signOut(auth);
   $('reload').onclick = () => load();
   $('q').oninput = render;
+  // 每次發新版前按一下：把所有玩家的雲端存檔存成一個 JSON 檔（請存在電腦裡，不要放進公開的 repo）
+  $('backup').onclick = () => {
+    const data = rows.map(r => ({ ...r, updatedAt: r.updatedAt ? r.updatedAt.toDate().toISOString() : null }));
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), count: data.length, saves: data }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'), d = new Date();
+    a.href = URL.createObjectURL(blob);
+    a.download = `寶貝切切樂-存檔備份-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}.json`;
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
 
   async function load() {
     $('msg').textContent = '讀取玩家資料中…';
@@ -101,7 +111,7 @@ if (!cfg || !cfg.apiKey) {
     for (const r of list) {
       const s = r.stats || {}, t = r.updatedAt ? r.updatedAt.toDate().toLocaleString('zh-TW', { hour12: false }) : '—';
       const tr = document.createElement('tr');
-      const cells = [r.name || '（無暱稱）', r.code, s.coins ?? '—', s.best ?? '—', `${s.cleared ?? 0} / 5`, r.version || '—', t];
+      const cells = [r.name || '（無暱稱）', r.code, s.coins ?? '—', s.best ?? '—', `${s.cleared ?? 0} / 10`, r.version || '—', t];
       cells.forEach((v, i) => { const td = document.createElement('td'); td.textContent = v; if (i === 1) td.className = 'code'; if (i >= 2 && i <= 3) td.className = 'num'; tr.appendChild(td); });
       const btn = document.createElement('button'); btn.className = 'copy ghost'; btn.textContent = '複製';
       btn.onclick = () => navigator.clipboard.writeText(r.code).then(() => { btn.textContent = '已複製'; setTimeout(() => btn.textContent = '複製', 1500); });

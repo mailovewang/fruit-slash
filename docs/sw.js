@@ -15,7 +15,8 @@ self.addEventListener('fetch', e => {
   const key = url.origin + url.pathname;              // 網址後面的 ?v=… 不影響，同一個檔案只存一份
   e.respondWith((async () => {
     try {
-      const res = await fetch(key, { cache: 'no-store' });
+      // no-cache：每次都向伺服器確認有沒有新版，檔案沒變就不用重新下載（伺服器回 304），開遊戲比較快
+      const res = await fetch(key, { cache: 'no-cache' });
       if (res.ok) { const c = await caches.open(CACHE); await c.put(key, res.clone()); }
       return res;
     } catch (err) {

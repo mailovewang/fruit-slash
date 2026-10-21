@@ -642,9 +642,15 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.9.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '1.9.2'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.9.2': [
+    '🍉 切水果的判定放寬：劃過水果邊緣也算切到（炸彈維持原本的判定，不會更容易誤炸）',
+    '🔋 更省電：在選單、暫停、商店時不再全速重畫畫面，手機比較不會發燙',
+    '⚡ 開遊戲更快：網路慢時最多等雲端 1 秒就先進遊戲，沒更新的檔案也不會重新下載',
+    '🎁 禮物只有收件人本人能領，挑戰也只有被挑戰的人能應戰',
+  ],
   '1.9.1': [
     '⚔️ 好友挑戰賽更公平：雙方一律用基本小刀、不算強化，水果出現的順序和數量完全一樣',
     '🏆 挑戰賽的分數不再算進最高分',
@@ -703,15 +709,25 @@ const PERKS = [
 ];
 const perkLvl = id => (save.perks && save.perks[id]) || 0;
 const perkCost = (p, lvl) => Math.round(p.base * Math.pow(1.8, lvl)); // 每升一級貴 1.8 倍
-const HIT_RADIUS = 0.6; // 判定半徑（相對水果圖示半徑）
+// 判定半徑（相對圖示半徑）：水果放寬，劃過邊緣也算切到；炸彈維持嚴格，擦邊不會誤炸
+const HIT_RADIUS = 0.85, BOMB_HIT_RADIUS = 0.6;
 
 // ===== 存檔 =====
-const SAVE_KEY = 'fruitslash_save_v1';
+// 測試模式：網址加上 ?test=1 就用另一份本機存檔，而且完全不連雲端，測試時不會動到任何玩家的真實存檔
+const TEST_MODE = new URLSearchParams(location.search).has('test');
+const SAVE_KEY = TEST_MODE ? 'fruitslash_test_v1' : 'fruitslash_save_v1';
+// 存檔格式版本：以後存檔欄位改名、搬家時，在 migrateSave 裡依版本號一步步轉換舊存檔，不會弄丟進度
+const SAVE_FMT = 1;
 // cloud = { code: 恢復碼, name: 暱稱 }，只存在這支手機，不會上傳到 save 欄位裡
-const defaultSave = () => ({ coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null, bossFirst: {}, checkin: null, seenVersion: null });
+const defaultSave = () => ({ fmt: SAVE_FMT, coins: 0, best: 0, owned: { basic: true }, levels: { basic: 1 }, equipped: 'basic', unlocked: 1, stageBest: {}, cleared: {}, perks: {}, cloud: null, bossFirst: {}, checkin: null, seenVersion: null });
+function migrateSave(s) {
+  // fmt 0（1.9.1 以前）→ 1：格式沒變，只是開始記版本號
+  if (!s.fmt) s.fmt = 1;
+  delete s.daily;
+  return s;
+}
 let save = defaultSave();
-try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (e) {}
-delete save.daily;
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = migrateSave(Object.assign(save, s)); } catch (e) {}
 function persist() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
   cloudSyncSoon();
@@ -730,7 +746,7 @@ function newCode() {
 }
 async function cloudInit() {
   const cfg = window.FIREBASE_CONFIG;
-  if (!cfg || !cfg.apiKey) { CLOUD.state = 'off'; return; }
+  if (TEST_MODE || !cfg || !cfg.apiKey) { CLOUD.state = 'off'; return; }
   try {
     const app = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`);
     const fs = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-firestore.js`);
@@ -779,7 +795,7 @@ async function cloudRestore(input) {
   const snap = await getDoc(doc(CLOUD.db, 'saves', code));
   if (!snap.exists()) throw new Error('找不到這組恢復碼，請再確認一次');
   const d = snap.data();
-  save = Object.assign(defaultSave(), d.save, { cloud: { code, name: d.name } });
+  save = migrateSave(Object.assign(defaultSave(), d.save, { cloud: { code, name: d.name } }));
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
   return d.name;
 }
@@ -1487,10 +1503,9 @@ function handleSegment(ax, ay, bx, by, dtms) {
   const len = Math.hypot(bx - ax, by - ay);
   if (len < 2 || len / dtms < 0.2) return;
   const ang = Math.atan2(by - ay, bx - ax);
-  const nx = -Math.sin(ang), ny = Math.cos(ang), hr = HIT_RADIUS * hitMul();
-  // 判定範圍比圖示小一圈：刀要真的劃過水果本體才算，旁邊靠很近的水果不會被誤切
+  const nx = -Math.sin(ang), ny = Math.cos(ang), hm = hitMul();
   for (const o of G.objs) {
-    if (o.dead || segDist(o.x, o.y, ax, ay, bx, by) >= o.r * hr) continue;
+    if (o.dead || segDist(o.x, o.y, ax, ay, bx, by) >= o.r * (o.kind === 'bomb' ? BOMB_HIT_RADIUS : HIT_RADIUS * hm)) continue;
     hitObj(o, ang, false, (ax - o.x) * nx + (ay - o.y) * ny);
   }
   const b = G.boss;
@@ -3262,7 +3277,7 @@ function renderPerks(list, det) {
   det.appendChild(card);
 }
 for (const t of document.querySelectorAll('.tab')) t.onclick = () => { audio(); shopTab = t.dataset.tab; renderShop(); };
-$('version').textContent = 'v' + VERSION;
+$('version').textContent = 'v' + VERSION + (TEST_MODE ? '・🧪 測試模式（不連雲端）' : '');
 
 $('btn-play').onclick = openStages;
 $('btn-stages-back').onclick = goMenu;
@@ -3352,7 +3367,8 @@ async function boot() {
   step(55, '準備水果…');
   for (const f of FRUITS) { art('s', f.id, S * 0.075 * (f.s || 1)); art('f', f.id, S * 0.075 * (f.s || 1)); await wait(0); }
   step(80, '連線雲端存檔…');
-  await Promise.race([cloudInit(), wait(4000)]);
+  // 最多等 1 秒，網路慢就先進遊戲，雲端在背景繼續連線（進度先存在手機裡，連上後自動同步）
+  await Promise.race([cloudInit(), wait(1000)]);
   step(100, '完成！');
   await wait(Math.max(200, 900 - (performance.now() - t0)));
   $('loading').classList.add('fade'); setTimeout(() => $('loading').classList.add('hidden'), 400);
@@ -3621,11 +3637,12 @@ $('btn-ach').onclick = () => { audio(); openAch(); };
 $('btn-ach-back').onclick = () => goMenu();
 
 // ===== 主迴圈 =====
-let last = performance.now();
+let last = performance.now(), lastIdleRender = 0;
 function loop(now) {
   const rdt = Math.min(0.033, (now - last) / 1000); last = now;
-  if (state === 'play') update(rdt);
-  render(now);
+  if (state === 'play') { update(rdt); render(now); }
+  // 不在玩的時候（選單、暫停、商店…）畫面被介面蓋住，每秒只重畫 4 次就好，比較省電、手機不會發燙
+  else if (now - lastIdleRender > 250) { lastIdleRender = now; render(now); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

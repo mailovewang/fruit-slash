@@ -48,9 +48,14 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // 目前登入的人在 profiles 裡登記的好友碼（用來確認「收件人是不是本人」）
+    function myCode() { return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.code; }
+
     // 好友禮物：文件 ID = 送的人_收的人_日期，所以每天每位好友只能送一次（不能覆蓋）
     match /gifts/{id} {
-      allow read, delete: if authed();
+      allow read: if authed();
+      // 只有收件人本人可以領取（刪除）禮物
+      allow delete: if authed() && resource.data.to == myCode();
       allow create: if authed()
         && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'day', 'at'])
         && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
@@ -66,7 +71,8 @@ service cloud.firestore {
         && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
         && num(request.resource.data.seed, 2147483647) && num(request.resource.data.score, 99999)
         && request.resource.data.reply == null && request.resource.data.replyName == null && request.resource.data.at == request.time;
-      allow update: if authed() && resource.data.reply == null
+      // 只有被挑戰的人本人可以填自己的分數
+      allow update: if authed() && resource.data.reply == null && resource.data.to == myCode()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'replyName'])
         && num(request.resource.data.reply, 99999) && shortStr(request.resource.data.replyName, 40);
       allow delete: if isAdmin();
