@@ -644,9 +644,13 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '1.9.3'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '1.9.4'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '1.9.4': [
+    '🚀 Boss 戰更順：Boss 變色、擊殺技特效改用比較省力的畫法，手機比較不會卡',
+    '🔋 火焰、毒霧、果汁漬和音效都減輕了負擔，玩久一點也比較不燙',
+  ],
   '1.9.3': [
     '🏆 排行榜防作弊：分數不合理的紀錄不會上榜，管理員也可以移除或封鎖作弊的玩家',
     '🔑 恢復碼提醒：還沒確認存好恢復碼的話，設定按鈕會出現 ❗（換手機時要靠它找回進度）',
@@ -824,8 +828,12 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// 尺寸分級：大小只差一點點的共用同一張圖，畫的時候再縮放，避免 Boss 蓄力變大、隨機大小的粒子每一格都重畫新圖
+const qSize = v => (v < 24 ? Math.max(4, Math.round(v)) : Math.round(v / 4) * 4);
+// 快取太多張時整個清掉重來（正常不會到，防止玩很久記憶體一直長）
+const cachePut = (m, k, c) => { if (m.size > 400) m.clear(); m.set(k, c); };
 function sprite(e, size) {
-  size = Math.max(4, Math.round(size));
+  size = qSize(size);
   const k = e + '|' + size;
   let c = spriteCache.get(k);
   if (c) return c;
@@ -836,12 +844,12 @@ function sprite(e, size) {
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.font = (size * DPR) + 'px ' + EMOJI_FONT;
   g.fillText(e, px / 2, px / 2 + size * DPR * 0.06);
-  c.logical = px / DPR;
-  spriteCache.set(k, c);
+  c.logical = px / DPR; c.size = size;
+  cachePut(spriteCache, k, c);
   return c;
 }
 function drawSprite(e, size, x, y, rot = 0, alpha = 1) {
-  const s = sprite(e, size), L = s.logical;
+  const s = sprite(e, size), L = s.logical * size / s.size;
   ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); if (rot) ctx.rotate(rot);
   ctx.drawImage(s, -L / 2, -L / 2, L, L); ctx.restore();
 }
@@ -849,7 +857,7 @@ function drawSprite(e, size, x, y, rot = 0, alpha = 1) {
 // ===== 寫實水果繪製（程式畫外皮光影與果肉切面，取代 emoji） =====
 function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 function art(kind, id, r) {
-  r = Math.max(4, Math.round(r));
+  r = qSize(r);
   const k = kind + id + '|' + r;
   let c = artCache.get(k);
   if (c) return c;
@@ -859,12 +867,22 @@ function art(kind, id, r) {
   const g = c.getContext('2d');
   g.translate(px / 2, px / 2); g.scale(DPR, DPR);
   (kind === 's' ? SKIN : FLESH)[id](g, r);
-  c.logical = px / DPR;
-  artCache.set(k, c);
+  c.logical = px / DPR; c.r = r;
+  cachePut(artCache, k, c);
   return c;
 }
-function drawArt(kind, id, r, x, y, rot = 0, alpha = 1) {
-  const c = art(kind, id, r), L = c.logical;
+// tint = [顏色, 濃度]：在一張小畫布上把圖染色再貼上去，取代很耗效能的 ctx.filter（Boss 蓄力、被凍、擊殺技用）
+const tintCv = document.createElement('canvas'), tintG = tintCv.getContext('2d');
+function drawArt(kind, id, r, x, y, rot = 0, alpha = 1, tint = null) {
+  let c = art(kind, id, r);
+  const L = c.logical * r / c.r;
+  if (tint && tint[1] > 0.01) {
+    if (tintCv.width !== c.width) tintCv.width = tintCv.height = c.width;
+    tintG.globalCompositeOperation = 'copy'; tintG.globalAlpha = 1; tintG.drawImage(c, 0, 0);
+    tintG.globalCompositeOperation = 'source-atop'; tintG.globalAlpha = Math.min(1, tint[1]); tintG.fillStyle = tint[0];
+    tintG.fillRect(0, 0, c.width, c.height);
+    c = tintCv;
+  }
   ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); if (rot) ctx.rotate(rot);
   ctx.drawImage(c, -L / 2, -L / 2, L, L); ctx.restore();
 }
@@ -1109,14 +1127,25 @@ function audio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   if (actx && actx.state === 'suspended') actx.resume();
 }
+// 共用一段 2 秒的白噪音，每次從隨機位置開始播、用音量曲線做出漸弱，不必每個音效都重新產生亂數
+let noiseBuf = null;
+function noiseBuffer() {
+  if (!noiseBuf) {
+    const n = actx.sampleRate * 2 | 0; noiseBuf = actx.createBuffer(1, n, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
+function noiseNode(dur, vol, t, dest) {
+  const s = actx.createBufferSource(); s.buffer = noiseBuffer();
+  const g = actx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.linearRampToValueAtTime(0, t + dur);
+  s.connect(g).connect(dest); s.start(t, Math.random() * (2 - dur)); s.stop(t + dur);
+  return s;
+}
 function noise(dur, freq, vol, type = 'highpass') {
   if (!actx || !settings().sfx) return;
-  const n = actx.sampleRate * dur | 0, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
-  const s = actx.createBufferSource(); s.buffer = b;
-  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
-  const g = actx.createGain(); g.gain.value = vol;
-  s.connect(f).connect(g).connect(actx.destination); s.start();
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.connect(actx.destination);
+  noiseNode(Math.min(dur, 1.9), vol, actx.currentTime, f);
 }
 function tone(f1, f2, dur, vol, type = 'sine', delay = 0) {
   if (!actx || !settings().sfx) return;
@@ -1254,7 +1283,7 @@ function orbitPart(cx, cy, kind, color, extra = {}) {
     orbit: { cx, cy, ang, rad, spd: 5 + Math.random() * 3, shrink: 2.2 } }, extra));
 }
 function splat(x, y, color, r) {
-  if (G.splats.length > 40) G.splats.shift();
+  if (G.splats.length > 24) G.splats.shift(); // 果汁漬最多留 24 灘（每灘要畫十幾個圓，太多會拖慢手機）
   // 果汁噴濺：中心一大灘 + 周圍放射狀的小滴 + 往下流的汁痕
   const blobs = Array.from({ length: 6 }, () => ({ dx: (Math.random() - 0.5) * r * 1.2, dy: (Math.random() - 0.5) * r * 1.2, r: r * (0.25 + Math.random() * 0.4) }));
   for (let i = 0; i < 10; i++) { const a = Math.random() * 7, d = r * (0.9 + Math.random() * 1.1); blobs.push({ dx: Math.cos(a) * d, dy: Math.sin(a) * d, r: r * (0.04 + Math.random() * 0.1) }); }
@@ -2153,9 +2182,28 @@ const BGDRAW = {
 function drawStageBG(now) {
   const dt = BG.last ? Math.min(0.05, (now - BG.last) / 1000) : 0; BG.last = now;
   BGDRAW[BG.type](now / 1000, dt);
-  // 暗角：讓水果和文字比較清楚
-  ctx.fillStyle = radial(ctx, W / 2, H * 0.45, S * 0.35, Math.max(W, H) * 0.8, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.42)']]);
-  ctx.fillRect(0, 0, W, H);
+  // 暗角：讓水果和文字比較清楚（畫在 1/4 大小的小圖上存起來，每格放大貼上，不用每格重算漸層）
+  if (!vignette.c || vignette.w !== W || vignette.h !== H) {
+    const c = vignette.c || document.createElement('canvas'), q = 4, g = c.getContext('2d');
+    c.width = Math.ceil(W / q); c.height = Math.ceil(H / q);
+    g.fillStyle = radial(g, W / 2 / q, H * 0.45 / q, S * 0.35 / q, Math.max(W, H) * 0.8 / q, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.42)']]);
+    g.fillRect(0, 0, c.width, c.height);
+    Object.assign(vignette, { c, w: W, h: H });
+  }
+  ctx.drawImage(vignette.c, 0, 0, W, H);
+}
+const vignette = { c: null, w: 0, h: 0 };
+// 發光粒子（火焰、毒霧、影子）：每種顏色先畫一張漸層光點存起來，之後直接縮放貼上
+const glowCache = new Map();
+function glowSprite(color, edge) {
+  const k = color + edge;
+  let c = glowCache.get(k);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'); g.fillStyle = radial(g, 32, 32, 0, 32, [[0, color], [1, edge]]); g.fillRect(0, 0, 64, 64);
+    cachePut(glowCache, k, c);
+  }
+  return c;
 }
 
 // ===== Boss 戰專屬背景動畫（每隻 Boss 不同） =====
@@ -2641,15 +2689,13 @@ function render(now) {
     const fk = f ? Math.min(1, f.t / f.brk) : 0;               // 擊殺技蓄力進度
     const jit = f ? (Math.random() - 0.5) * b.r * 0.12 * fk : b.windup > 0 ? (Math.random() - 0.5) * b.r * 0.08 * (0.3 + wk) : 0;
     const bx = b.x + jit, by = b.y + jit, tilt = Math.sin(b.t * 2) * 0.12;
-    ctx.save();
-    if (f) ctx.filter = { ice: `saturate(${1 - fk * 0.8}) hue-rotate(${fk * 170}deg) brightness(${1 + fk * 0.6})`, shadow: `brightness(${1 - fk})`,
-      fire: `sepia(${fk}) saturate(${1 + fk * 3}) brightness(${1 + fk * 0.3})`, poison: `hue-rotate(${fk * 80}deg) saturate(${1 + fk})`,
-      time: `grayscale(${fk})`, gold: `sepia(${fk}) saturate(${1 + fk * 2}) brightness(${1 + fk * 0.4})` }[f.id] || `brightness(${1 + fk * 0.6})`;
-    else if (b.flash > 0) ctx.filter = 'brightness(1.8)';
-    else if (b.windup > 0) ctx.filter = `sepia(${wk * 0.6}) saturate(${1 + wk * 2}) hue-rotate(-${wk * 25}deg) brightness(${1 + wk * 0.3})`;
-    else if (b.slow > 0) ctx.filter = 'hue-rotate(160deg) saturate(0.6) brightness(1.3)';
-    drawArt('s', b.def.skin, b.r * (b.flash > 0 ? 1.08 : 1 + wk * 0.08), bx, by, tilt);
-    ctx.restore();
+    // Boss 變色：擊殺技（依刀的屬性）、被打閃白、蓄力發紅、被凍變藍
+    const FIN_TINT = { ice: ['#bfe9ff', 0.65], shadow: ['#0b0014', 0.95], fire: ['#ff7a1a', 0.55], poison: ['#57d16b', 0.55], time: ['#9a9a9a', 0.75], gold: ['#ffcf3f', 0.55] };
+    const tint = f ? [(FIN_TINT[f.id] || ['#ffffff'])[0], (FIN_TINT[f.id] || [0, 0.55])[1] * fk]
+      : b.flash > 0 ? ['#ffffff', 0.55]
+      : b.windup > 0 ? ['#ff3b1a', wk * 0.45]
+      : b.slow > 0 ? ['#7fd3ff', 0.4] : null;
+    drawArt('s', b.def.skin, b.r * (b.flash > 0 ? 1.08 : 1 + wk * 0.08), bx, by, tilt, 1, tint);
     if (!f) drawBossFace(bx, by, b.r, tilt, phase2 || b.windup > 0, now);
     else if (f.id === 'shadow') { ctx.fillStyle = '#e0aaff'; circle(bx - b.r * 0.3, by - b.r * 0.05, b.r * 0.08); circle(bx + b.r * 0.3, by - b.r * 0.05, b.r * 0.08); }
     drawSprite('👑', b.r * 0.8, bx, by - b.r * 1.0 + Math.sin(now / 200) * 4, tilt);
@@ -2734,9 +2780,11 @@ function render(now) {
   }
   ctx.globalAlpha = 1;
 
+  let flames = 0;
   for (const p of G.parts) {
     const a = Math.max(0, p.life / p.max);
     if (p.e) { drawSprite(p.e, p.size, p.x, p.y, p.rot, a); continue; }
+    if (p.kind === 'flame') { flames++; continue; } // 火焰最後一起畫，只切換一次「發光疊加」模式
     ctx.globalAlpha = a; ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
     if (p.drop) {
       // 果汁水滴：順著飛行方向拉長
@@ -2752,12 +2800,17 @@ function render(now) {
       const ang = p.orbit ? p.orbit.ang + Math.PI / 2 : Math.atan2(p.vy, p.vx), len = S * 0.05;
       ctx.lineWidth = p.size; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - Math.cos(ang) * len, p.y - Math.sin(ang) * len); ctx.stroke();
-    } else if (p.kind === 'flame') {
-      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * 0.8;
-      ctx.fillStyle = radial(ctx, p.x, p.y, 0, p.size, [[0, p.color], [1, 'rgba(255,60,0,0)']]); circle(p.x, p.y, p.size); ctx.restore();
     } else if (p.kind === 'ghost') {
-      ctx.globalAlpha = a * 0.6; ctx.fillStyle = radial(ctx, p.x, p.y, 0, p.size, [[0, p.color], [1, 'rgba(20,0,40,0)']]); circle(p.x, p.y, p.size);
+      ctx.globalAlpha = a * 0.6; ctx.drawImage(glowSprite(p.color, 'rgba(20,0,40,0)'), p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
     } else circle(p.x, p.y, p.size);
+  }
+  if (flames) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of G.parts) if (p.kind === 'flame' && !p.e) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max) * 0.8;
+      ctx.drawImage(glowSprite(p.color, 'rgba(255,60,0,0)'), p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
   ctx.globalAlpha = 1;
 
@@ -3487,7 +3540,7 @@ function musicTick() {
     const s = MUSIC.step % 32, t = MUSIC.next;
     if (p.mel[s] >= 0) musicNote(f(p.mel[s]), t, tempo * 1.6, 0.045, 'triangle');
     if (s % 4 === 0) musicNote(f(p.bass[(s / 4) % p.bass.length]) / 4, t, tempo * 3.5, 0.07, 'sine');
-    if (mode !== 'menu' && s % 2 === 1) { const n = actx.createBufferSource(), b = actx.createBuffer(1, 800, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < 800; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / 800); n.buffer = b; const g = actx.createGain(); g.gain.value = 0.02; n.connect(g).connect(MUSIC.master); n.start(t); }
+    if (mode !== 'menu' && s % 2 === 1) noiseNode(800 / actx.sampleRate, 0.02, t, MUSIC.master); // 小鼓（共用白噪音）
     if (mode === 'boss' && s % 4 === 0) { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.15); g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18); o.connect(g).connect(MUSIC.master); o.start(t); o.stop(t + 0.2); }
     MUSIC.step++; MUSIC.next += tempo;
   }
