@@ -27,7 +27,7 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif, "Noto Color Emoji";
     touch-action: none; user-select: none; -webkit-user-select: none; }
   canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
   .hidden { display: none !important; }
@@ -576,7 +576,21 @@ const CONFIG = {
   herName: '寶貝',
 };
 
-const EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+// 表情符號字型：每家手機內建的表情長得都不一樣（同一顆星星，三星、小米、Pixel 畫出來不同），
+// 所以非蘋果的裝置統一下載 Google 的 Noto Color Emoji（只抓遊戲用到的那些字，約 90KB），大家看到的就一樣
+const EMOJI_FONT = '"Noto Color Emoji","Segoe UI Emoji","Apple Color Emoji",sans-serif';
+const USE_NOTO = !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent); // 蘋果的 Safari 不一定支援這種彩色字型格式，維持用內建的
+async function loadEmojiFont(timeout) {
+  if (!USE_NOTO) return;
+  // 從整個網頁（包含程式碼）找出所有用到的表情符號，以後新增的表情也會自動包含
+  const set = new Set(document.documentElement.innerHTML.match(/\p{Extended_Pictographic}️?/gu) || []);
+  const link = document.createElement('link'); link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap&text=' + encodeURIComponent([...set].join(''));
+  document.head.appendChild(link);
+  await Promise.race([new Promise(res => { link.onload = res; link.onerror = res; }), new Promise(res => setTimeout(res, timeout))]);
+  await Promise.race([document.fonts.load('48px "Noto Color Emoji"', '🌟✨🍉'), new Promise(res => setTimeout(res, timeout))]).catch(() => {});
+  spriteCache.clear(); // 之前用手機內建字型畫好的表情圖丟掉，之後用新字型重畫
+}
 
 // id 對應下面 SKIN（外皮）和 FLESH（果肉切面）的繪製函式；c 是果汁顏色
 const FRUITS = [
@@ -722,9 +736,15 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '2.1.2'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '2.2.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '2.2.0': [
+    '♾️ 無盡模式改版：每打倒 10 隻 Boss 進入下一輪，水果更快更多、炸彈變多、Boss 攻擊更快；每一輪金幣多 0.2 倍',
+    '⚔️ 好友挑戰改成無盡模式玩法：Boss 一直來、3 顆愛心，愛心用完才結算，比誰撐得久、分數高',
+    '🏅 成就從 18 個增加到 46 個：寵物、扭蛋、禪模式、香蕉、完美切、好友、週榜…',
+    '⭐ 統一表情符號：不同牌子的手機看到的星星、愛心、刀光閃光都一樣了',
+  ],
   '2.1.2': [
     '🎰 扭蛋有動畫了：扭蛋掉下來、搖一搖、啵！打開；抽到神刀會發金光、放彩帶',
     '⏩ 十連抽會一顆一顆打開，等不及可以按「跳過」直接看結果',
@@ -1163,6 +1183,31 @@ const SKIN = {
     shade(g, circ(g, r, 1.15, 0.95), r, 0.3);
     g.fillStyle = '#4e6b1f'; g.beginPath(); g.moveTo(-0.1 * r, -0.8 * r); g.lineTo(-0.06 * r, -1.12 * r); g.lineTo(0.12 * r, -1.1 * r); g.lineTo(0.1 * r, -0.8 * r); g.fill();
   },
+  // 金星：圓圓胖胖的立體星星＋外圈小光芒
+  star(g, r) {
+    g.fillStyle = 'rgba(255,214,90,0.9)';
+    for (let i = 0; i < 6; i++) { // 小光芒（三角形）
+      const a = i / 6 * Math.PI * 2 + 0.26, d = r * 1.08;
+      g.save(); g.translate(Math.cos(a) * d, Math.sin(a) * d); g.rotate(a + Math.PI / 2);
+      g.beginPath(); g.moveTo(0, -r * 0.13); g.lineTo(r * 0.1, r * 0.08); g.lineTo(-r * 0.1, r * 0.08); g.closePath(); g.fill(); g.restore();
+    }
+    const path = () => {
+      g.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.46 : r * 0.92; i ? g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      g.closePath();
+    };
+    g.lineJoin = 'round'; g.lineWidth = r * 0.22; g.strokeStyle = '#ffc21a'; path(); g.stroke(); // 粗圓角邊框讓尖角變圓
+    path(); g.fillStyle = radial(g, -0.25 * r, -0.3 * r, 0, r * 1.1, [[0, '#fff6b8'], [0.45, '#ffd84a'], [1, '#f2a900']]); g.fill();
+    g.save(); path(); g.clip();
+    g.fillStyle = radial(g, -0.25 * r, -0.35 * r, 0, r * 0.45, [[0, 'rgba(255,255,255,0.75)'], [1, 'rgba(255,255,255,0)']]); g.fillRect(-r, -r, r * 2, r * 2);
+    g.fillStyle = 'rgba(200,110,0,0.22)'; g.fillRect(-r, r * 0.25, r * 2, r); g.restore();
+  },
+  // 補血愛心：粉紅色立體愛心
+  heart(g, r) {
+    const path = () => { g.beginPath(); g.moveTo(0, r * 0.85); g.bezierCurveTo(-r * 1.25, -r * 0.05, -r * 0.6, -r * 1.05, 0, -r * 0.45); g.bezierCurveTo(r * 0.6, -r * 1.05, r * 1.25, -r * 0.05, 0, r * 0.85); g.closePath(); };
+    path(); g.fillStyle = radial(g, -0.3 * r, -0.4 * r, 0, r * 1.3, [[0, '#ffc2d6'], [0.5, '#ff5c8a'], [1, '#d6245a']]); g.fill();
+    shade(g, path, r, 0.6);
+  },
   bomb(g, r) {
     const path = circ(g, r * 0.95);
     path(); g.fillStyle = radial(g, -0.3 * r, -0.35 * r, 0, r, [[0, '#5a5a66'], [0.6, '#1d1d24'], [1, '#050507']]); g.fill();
@@ -1383,6 +1428,8 @@ function newGame(stage) {
   initBG(st.bg);
 }
 const gravity = () => H * 1.25;
+// 無盡模式（挑戰賽也是）的「第幾輪」：每打倒 10 隻 Boss 加一輪，從 0 開始
+const endlessTier = () => (G && G.endless ? Math.floor(G.bossIndex / 10) : 0);
 
 const R = () => (G && G.rand ? G.rand() : Math.random());
 function launch(kind, opts) {
@@ -1400,8 +1447,8 @@ function launch(kind, opts) {
     if (f.e) o.e = f.e; else o.art = f.id; // 聖誕禮物盒這種用表情符號畫，水果用程式畫
   }
   else if (kind === 'bomb') { o.art = 'bomb'; o.r = r * 0.95; }
-  else if (kind === 'star') { o.e = '🌟'; o.r = r * 0.85; }
-  else if (kind === 'heart') { o.e = '💗'; o.r = r * 0.85; }
+  else if (kind === 'star') { o.art = 'star'; o.r = r * 0.85; }   // 金星、愛心用程式畫，每支手機看起來都一樣
+  else if (kind === 'heart') { o.art = 'heart'; o.r = r * 0.85; }
   else if (kind === 'banana') { o.e = '🍌'; o.r = r * 0.95; o.bt = ['freeze', 'frenzy', 'coin'][Math.random() * 3 | 0]; }
   Object.assign(o, opts);
   G.objs.push(o);
@@ -1412,7 +1459,8 @@ function pickKind(diff) {
   const pl = id => (G.chal ? 0 : perkLvl(id));
   // 新手教學第一步（還沒切到第一顆水果）不出炸彈
   // 禪模式沒有炸彈
-  const r = R(), bomb = (G.tut && !G.tut.cut) || G.zen ? 0 : (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
+  // 無盡模式每一輪炸彈多 1.5%（最多多 12%）
+  const r = R(), bomb = (G.tut && !G.tut.cut) || G.zen ? 0 : ((G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb')) + Math.min(0.12, 0.015 * endlessTier()));
   const chick = G.pet && G.pet.id === 'chick' ? G.pet.lvl : 0; // 小雞：金星、愛心更常出現
   const star = 0.03 + 0.012 * pl('star') + 0.01 * chick, heart = 0.015 + 0.01 * pl('heart') + 0.005 * chick;
   // 小雞帶來的金星、愛心：小雞開心跳一下、灑羽毛
@@ -1504,7 +1552,8 @@ function makeHalves(o, ang, off = 0, col = '#fff', force = 1) {
 
 function addCoins(n) {
   const dog = G.pet && G.pet.id === 'dog' ? 0.1 + 0.05 * G.pet.lvl : 0; // 小狗狗：金幣加成
-  const v = n * (1 + 0.08 * perkLvl('coin') + dog) * (G.buff && G.buff.coin > 0 ? 2 : 1) + G.coinFrac, w = Math.floor(v + 1e-9);
+  // 無盡模式每一輪金幣多 0.2 倍
+  const v = n * (1 + 0.08 * perkLvl('coin') + dog) * (G.buff && G.buff.coin > 0 ? 2 : 1) * (1 + 0.2 * endlessTier()) + G.coinFrac, w = Math.floor(v + 1e-9);
   G.coinFrac = v - w; save.coins += w; G.coinsEarned += w;
   // 小狗狗幫忙多賺的金幣：從牠身上跳出一枚金幣（不要太頻繁）
   if (dog && w > 0 && (G.pet.coinFx === undefined || G.time - G.pet.coinFx > 0.6)) {
@@ -1546,7 +1595,7 @@ const scoreMul = () => (G.buff && G.buff.frenzy > 0 ? 2 : 1);
 // 完美切：刀正好劃過水果中心，多 1 分、白色閃光
 function perfectCut(o, mul) {
   if (G.lastPerfect !== undefined && G.time - G.lastPerfect < 0.25) return;
-  G.lastPerfect = G.time; G.score += mul;
+  G.lastPerfect = G.time; G.score += mul; track('perfect');
   ring(o.x, o.y, o.r * 1.6, '#ffffff', 0.3, 0.015); juice(o.x, o.y, '#ffffff', 6, 1.4);
   text(o.x, o.y - o.r * 1.1, '完美！+' + mul, '#ffffff', 0.05, 0.7);
 }
@@ -1565,6 +1614,7 @@ const BANANAS = {
 };
 function useBanana(o) {
   const b = BANANAS[o.bt]; if (!b) return;
+  track('banana');
   if (o.bt === 'freeze') { G.slowT = Math.max(G.slowT, 4); sfx.freeze(); }
   else { G.buff[o.bt] = 6; sfx.win(); }
   text(W / 2, H * 0.42, b.label, b.color, 0.06, 1.6); ring(o.x, o.y, S * 0.25, b.glow, 0.5, 0.03);
@@ -1718,7 +1768,6 @@ function explodeBomb(o) {
   juice(o.x, o.y, '#ffb703', 24, 1.6); juice(o.x, o.y, '#333', 16, 1.2);
   G.flash = 0.35; G.flashColor = '#fff'; G.shake = 0.45;
   sfx.bomb(); buzz(250);
-  if (G.chal) { G.score = Math.max(0, G.score - 10); text(o.x, o.y, '-10', '#ff4d6d', 0.08); updateHUD(); return; }
   text(o.x, o.y, '-❤️', '#ff4d6d', 0.08);
   loseHeart();
 }
@@ -1744,7 +1793,7 @@ function updateZones(dt, rdt) {
 }
 
 function loseHeart() {
-  if (G.overT > 0 || G.done || G.chal || G.zen) return; // 挑戰賽、禪模式不扣愛心
+  if (G.overT > 0 || G.done || G.zen) return; // 禪模式不扣愛心
   // 聖光刀的護盾：抵擋一次
   if (G.shield > 0) { G.shield--; text(W / 2, H * 0.5, '🛡️ 護盾抵擋！', '#fff3b0', 0.08, 1); ring(W / 2, H * 0.5, S * 0.3, '#ffd166', 0.5); updateHUD(); return; }
   G.hearts--;
@@ -1876,8 +1925,10 @@ function bossBladeEffectOne(id, b) {
 }
 // Boss 攻擊分兩段：先蓄力預告（停住、發紅光、畫出炸彈落點軌跡），時間到才真的丟出去
 function bossWindup(b, phase2) {
-  const bombs = phase2 ? 2 : 1, fruits = 2, plan = [];
-  const add = kind => plan.push({ kind, vx: (Math.random() - 0.5) * W * 0.9, vy: -H * (0.25 + Math.random() * 0.35) });
+  // 無盡模式每兩輪 Boss 多丟一顆炸彈（最多多 2 顆）
+  const bombs = (phase2 ? 2 : 1) + Math.min(2, Math.floor(endlessTier() / 2)), fruits = 2, plan = [];
+  const rr = G.rand2 || Math.random; // 挑戰賽：Boss 的攻擊用另一組固定亂數，雙方一樣
+  const add = kind => plan.push({ kind, vx: (rr() - 0.5) * W * 0.9, vy: -H * (0.25 + rr() * 0.35) });
   for (let i = 0; i < bombs; i++) add('bomb');
   for (let i = 0; i < fruits; i++) add('fruit');
   b.plan = plan;
@@ -1885,10 +1936,13 @@ function bossWindup(b, phase2) {
   tone(880, 880, 0.12, 0.08, 'square'); tone(880, 880, 0.12, 0.08, 'square', 0.25);
 }
 function bossRelease(b) {
+  // Boss 丟出來的東西不能用到水果出場的那組亂數，不然挑戰賽雙方後面的水果就不一樣了
+  const keep = G.rand; if (G.rand2) G.rand = G.rand2;
   for (const p of b.plan) {
     const o = launch(p.kind, { thrown: true });
     o.x = b.x; o.y = b.y + b.r * 0.4; o.vx = p.vx; o.vy = p.vy;
   }
+  G.rand = keep;
   b.plan = null;
   b.flash = 0.15;
   noise(0.15, 900, 0.2, 'bandpass');
@@ -1926,7 +1980,13 @@ function finishBoss() {
     // 無盡模式：換到下一個關卡的場景繼續打
     G.stage = G.bossIndex % STAGES.length; G.st = STAGES[G.stage]; initBG(G.st.bg);
     G.nextBoss = G.score + 60;
-    text(W / 2, H * 0.6, '♾️ 前往 ' + G.st.icon + ' ' + G.st.name, '#e0aaff', 0.07, 2);
+    if (G.bossIndex % 10 === 0) {
+      // 每打倒 10 隻 Boss 進入下一輪：難度上升、金幣變多
+      const t = endlessTier();
+      text(W / 2, H * 0.52, `🔥 第 ${t + 1} 輪！難度上升`, '#ff8fa3', 0.08, 2.4);
+      text(W / 2, H * 0.62, `💰 金幣 ×${(1 + 0.2 * t).toFixed(1)}`, '#ffd166', 0.07, 2.4);
+      G.flash = 0.25; G.flashColor = '#ff4d6d'; tone(220, 880, 0.6, 0.12, 'sawtooth');
+    } else text(W / 2, H * 0.6, '♾️ 前往 ' + G.st.icon + ' ' + G.st.name, '#e0aaff', 0.07, 2);
   } else if (G.bossIndex >= G.st.bosses.length) {
     G.done = true; G.clearT = 2.4;
     text(W / 2, H * 0.6, '🎉 關卡完成！', '#ffffff', 0.09, 2.4);
@@ -2686,28 +2746,25 @@ function update(rdt) {
   G.timeScale += (target - G.timeScale) * Math.min(1, rdt * 6);
   const dt = rdt * G.timeScale, g = gravity();
 
-  if (G.overT > 0) { G.overT -= rdt; if (G.overT <= 0) { gameOver(); return; } }
-  if (G.chal) {
-    const left = Math.max(0, Math.ceil(CHAL_TIME - G.time));
-    if (left !== G.chalLeft) { G.chalLeft = left; $('stage-hud').textContent = `⚔️ 挑戰 ${G.chal.toName}・剩 ${left} 秒`; }
-    if (G.time >= CHAL_TIME && (G.chalClock || 0) >= CHAL_TIME && !G.pending.length && G.objs.every(o => o.dead || o.kind === 'bomb')) { challengeEnd(); return; }
-  }
+  if (G.overT > 0) { G.overT -= rdt; if (G.overT <= 0) { if (G.chal) challengeEnd(); else gameOver(); return; } } // 挑戰賽：愛心用完就結算
   if (G.clearT > 0) { G.clearT -= rdt; if (G.clearT <= 0) { stageClear(); return; } }
   if (G.fin) { updateFinisher(G.fin, rdt); if (G.fin.t >= G.fin.dur) { G.fin = null; finishBoss(); } }
 
   // 生成
   if (!G.boss && !G.done && G.score >= G.nextBoss) spawnBoss();
   if (G.warnT > 0) G.warnT -= rdt;
-  // 挑戰賽的出現節奏跟著真實時間走（60 秒倒數也是真實時間），不受慢動作影響
+  // 挑戰賽的出現節奏跟著真實時間走，不受慢動作影響
   const sdt = G.chal ? rdt : dt;
   G.spawnT -= sdt;
   // 挑戰賽用「排定的出場時間」(chalClock) 算難度和截止，不看實際畫面時間，雙方手機快慢不同也會出一樣多顆
-  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.chal && (G.chalClock || 0) >= CHAL_TIME) && !(G.zen && G.time >= ZEN_TIME)) {
+  if (G.spawnT <= 0 && G.overT <= 0 && !G.done && !G.fin && !(G.zen && G.time >= ZEN_TIME)) {
     // 難度慢慢上升（400 分才到最難；禪模式照時間）；一次最多 3 顆，最後一關最多 4 顆，而且一顆一顆錯開飛出來
     const diff = G.chal ? Math.min(1, (G.chalClock || 0) / 45) : G.zen ? Math.min(1, G.time / 60) : Math.min(1, G.score / 400);
-    G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1) * (G.buff.frenzy > 0 ? 0.45 : 1) * (G.zen ? 0.8 : 1);
+    // 無盡模式每一輪：出水果快 15%、每波多一顆（最多多 4 顆）
+    const tier = endlessTier();
+    G.spawnT = (1.9 - 0.6 * diff) / (1 + (G.st.diff - 1) * 0.5) * (G.boss ? 1.8 : 1) * (G.buff.frenzy > 0 ? 0.45 : 1) * (G.zen ? 0.8 : 1) / (1 + 0.15 * tier);
     if (G.chal) G.chalClock = (G.chalClock || 0) + G.spawnT;
-    const n = 1 + Math.floor(R() * (1 + diff * 2 + (G.st.diff - 1)));
+    const n = 1 + Math.floor(R() * (1 + diff * 2 + (G.st.diff - 1))) + Math.min(4, tier);
     for (let i = 0; i < n; i++) G.pending.push({ t: i * 0.28, kind: pickKind(diff) });
   }
   for (const p of G.pending) { p.t -= sdt; if (p.t <= 0) { launch(p.kind); p.done = true; } }
@@ -2766,7 +2823,7 @@ function update(rdt) {
       if (b.enter && Math.abs(b.y - ty) < 6) b.enter = false;
       const phase2 = b.hp < b.maxHp / 2;
       b.atkT -= dt * bs;
-      if (b.atkT <= 0 && !b.enter) { b.atkT = phase2 ? 1.6 : 2.6; bossWindup(b, phase2); }
+      if (b.atkT <= 0 && !b.enter) { b.atkT = (phase2 ? 1.6 : 2.6) / (1 + 0.12 * endlessTier()); bossWindup(b, phase2); } // 無盡模式越後面攻擊越快
     }
     if (b.burn > 0) {
       b.burn -= dt; damageBoss(b.burnDps * dt, true);
@@ -3477,7 +3534,9 @@ function updateHUD() {
   if (!G) return;
   $('score').textContent = G.score;
   $('best-hud').textContent = '最高 ' + Math.max((G.endless ? save.endlessBestScore : save.stageBest[G.stage]) || 0, G.score);
-  if (!G.chal) $('stage-hud').textContent = G.endless ? `♾️ 無盡模式・${G.st.icon} ${G.st.name}・已打倒 ${G.bossIndex} 隻` : `${G.st.icon} ${G.st.name}・Boss ${G.bossIndex}/5`;
+  const tierTxt = G.endless ? `第 ${endlessTier() + 1} 輪・` : '';
+  $('stage-hud').textContent = G.chal ? `⚔️ 挑戰 ${G.chal.toName}・${tierTxt}打倒 ${G.bossIndex} 隻 Boss`
+    : G.endless ? `♾️ ${tierTxt}${G.st.icon} ${G.st.name}・已打倒 ${G.bossIndex} 隻` : `${G.st.icon} ${G.st.name}・Boss ${G.bossIndex}/5`;
   const slots = Math.max(START_HEARTS + perkLvl('life'), G.hearts);
   $('hearts').textContent = '❤️'.repeat(Math.max(0, G.hearts)) + '🤍'.repeat(Math.max(0, slots - G.hearts)) + (G.shield ? '🛡️' : '');
   $('coins-hud').textContent = '💰 ' + save.coins;
@@ -3758,9 +3817,11 @@ async function boot() {
   const t0 = performance.now();
   $('load-ver').textContent = 'v' + VERSION;
   step(10, '準備畫面中…');
+  const emojiP = loadEmojiFont(2500); // 一邊下載表情字型、一邊載入封面
   await Promise.race([document.fonts ? document.fonts.ready : Promise.resolve(), wait(1500)]);
   step(30, '載入封面…');
   await Promise.race([new Promise(res => { const img = new Image(); img.onload = img.onerror = res; img.src = 'cover-bg.jpg'; }), wait(3000)]);
+  await emojiP;
   step(55, '準備水果…');
   for (const f of FRUITS) { art('s', f.id, S * 0.075 * (f.s || 1)); art('f', f.id, S * 0.075 * (f.s || 1)); await wait(0); }
   step(80, '連線雲端存檔…');
@@ -3959,6 +4020,35 @@ const ACHIEVEMENTS = [
   { id: 'e3', icon: '♾️', name: '無盡勇者', desc: '無盡模式打倒 3 隻 Boss', stat: 'endlessBest', n: 3, reward: 500 },
   { id: 'e10', icon: '🔥', name: '永不放棄', desc: '無盡模式打倒 10 隻 Boss', stat: 'endlessBest', n: 10, reward: 2000 },
   { id: 'rich', icon: '💰', name: '小富翁', desc: '累積在遊戲中賺到 10,000 金幣', stat: 'coins', n: 10000, reward: 500 },
+  // ===== 2.2.0 新增 =====
+  { id: 'f50000', icon: '🍓', name: '水果大亨', desc: '累積切 50,000 顆水果', stat: 'fruit', n: 50000, reward: 5000 },
+  { id: 'b500', icon: '🐉', name: 'Boss 終結者', desc: '累積打倒 500 隻 Boss', stat: 'boss', n: 500, reward: 5000 },
+  { id: 'c15', icon: '🌀', name: '一刀千斬', desc: '一刀連斬 15 顆水果', stat: 'maxCombo', n: 15, reward: 1500 },
+  { id: 'p100', icon: '🎯', name: '神準刀客', desc: '完美切（劃過正中間）100 次', stat: 'perfect', n: 100, reward: 500 },
+  { id: 'p1000', icon: '💎', name: '完美主義', desc: '完美切 1,000 次', stat: 'perfect', n: 1000, reward: 3000 },
+  { id: 'ban50', icon: '🍌', name: '香蕉狂熱', desc: '切開 50 根特殊香蕉', stat: 'banana', n: 50, reward: 800 },
+  { id: 'zen300', icon: '🧘', name: '心如止水', desc: '禪模式拿到 300 分', calc: () => save.zenBest || 0, n: 300, reward: 800 },
+  { id: 'zen600', icon: '☯️', name: '禪宗大師', desc: '禪模式拿到 600 分', calc: () => save.zenBest || 0, n: 600, reward: 2000 },
+  { id: 'e30', icon: '🌋', name: '無盡征服者', desc: '無盡模式打倒 30 隻 Boss（撐過第 3 輪）', stat: 'endlessBest', n: 30, reward: 4000 },
+  { id: 'e50', icon: '🌌', name: '永恆傳說', desc: '無盡模式打倒 50 隻 Boss', stat: 'endlessBest', n: 50, reward: 8000 },
+  { id: 'pet1', icon: '🐾', name: '第一隻寵物', desc: '領養一隻寵物', calc: () => Object.keys(save.pets || {}).length, n: 1, reward: 300 },
+  { id: 'pet7', icon: '🏠', name: '寵物之家', desc: '領養全部 7 隻寵物', calc: () => Object.keys(save.pets || {}).length, n: 7, reward: 5000 },
+  { id: 'petmax', icon: '🍖', name: '寵物大師', desc: '把一隻寵物餵到滿級', calc: () => Math.max(0, ...Object.values(save.pets || {})), n: 5, reward: 2000 },
+  { id: 'g10', icon: '🎰', name: '扭蛋新手', desc: '抽 10 次扭蛋', calc: () => (save.gacha ? save.gacha.total : 0), n: 10, reward: 300 },
+  { id: 'g100', icon: '🎲', name: '扭蛋達人', desc: '抽 100 次扭蛋', calc: () => (save.gacha ? save.gacha.total : 0), n: 100, reward: 2000 },
+  { id: 'gb1', icon: '🌙', name: '扭蛋神刀', desc: '抽到一把扭蛋限定神刀', calc: () => BLADES.filter(b => b.gacha && save.owned[b.id]).length, n: 1, reward: 1000 },
+  { id: 'gb4', icon: '👑', name: '神刀收藏家', desc: '集滿 4 把扭蛋限定神刀', calc: () => BLADES.filter(b => b.gacha && save.owned[b.id]).length, n: 4, reward: 5000 },
+  { id: 't10', icon: '🌈', name: '刀光收藏家', desc: '擁有 10 種刀光', calc: () => Object.keys(save.trails || {}).filter(k => k !== 'default').length, n: 10, reward: 1500 },
+  { id: 'fr1', icon: '👫', name: '交個朋友', desc: '加 1 位好友', calc: () => (save.friends || []).length, n: 1, reward: 200 },
+  { id: 'fr5', icon: '🎉', name: '好友成群', desc: '加 5 位好友', calc: () => (save.friends || []).length, n: 5, reward: 800 },
+  { id: 'gift10', icon: '🎁', name: '送禮達人', desc: '送出 10 份禮物給好友', stat: 'gift', n: 10, reward: 500 },
+  { id: 'cw1', icon: '🏆', name: '挑戰勝利', desc: '贏得 1 場好友挑戰', stat: 'chalWin', n: 1, reward: 300 },
+  { id: 'cw10', icon: '⚔️', name: '常勝將軍', desc: '贏得 10 場好友挑戰', stat: 'chalWin', n: 10, reward: 2000 },
+  { id: 'wk3', icon: '🥇', name: '週榜英雄', desc: '在每週排行榜拿到前三名', stat: 'weekTop', n: 1, reward: 1000 },
+  { id: 'ev1', icon: '🎃', name: '節日玩家', desc: '拿到一個節日活動的限定刀光', calc: () => TRAILS.filter(t => t.event && save.trails && save.trails[t.id]).length, n: 1, reward: 500 },
+  { id: 'game100', icon: '🎮', name: '熱愛遊戲', desc: '玩 100 局', stat: 'game', n: 100, reward: 1000 },
+  { id: 'd60', icon: '📆', name: '超級鐵粉', desc: '累積簽到 60 天', calc: () => (save.checkin ? save.checkin.days : 0), n: 60, reward: 2000 },
+  { id: 'rich2', icon: '🏦', name: '大富翁', desc: '累積在遊戲中賺到 100,000 金幣', stat: 'coins', n: 100000, reward: 3000 },
 ];
 const achValue = a => (a.calc ? a.calc() : stats()[a.stat] || 0);
 // 達成就自動發獎勵並跳出通知
@@ -4083,7 +4173,7 @@ function gachaDraw(times) {
   if (save.coins < cost) return;
   save.coins -= cost;
   gachaLast = Array.from({ length: times }, gachaOnce);
-  persist();
+  checkAchievements(); persist();
   renderShop();
   playGachaAnim(gachaLast);
 }
@@ -4211,10 +4301,10 @@ function renderPets(list, det) {
     <div class="desc">${lvl ? '目前：' + p.desc(lvl) : p.desc(1)}</div><div class="fx">${lvl && lvl < MAX_LEVEL ? '餵食升級後：' + p.desc(lvl + 1) : lvl ? '已經長到最大了 ✨' : '挑戰賽時寵物會在旁邊休息，不會幫忙'}</div><div class="actions"></div>`;
   const act = card.querySelector('.actions');
   const mk = (label, cls, dis, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.textContent = label; b.disabled = dis; b.onclick = () => { audio(); fn(); }; act.appendChild(b); };
-  if (!lvl) mk(`領養 💰${p.price}`, '', save.coins < p.price, () => { save.coins -= p.price; save.pets[p.id] = 1; save.pet = p.id; persist(); sfx.win(); renderShop(); });
+  if (!lvl) mk(`領養 💰${p.price}`, '', save.coins < p.price, () => { save.coins -= p.price; save.pets[p.id] = 1; save.pet = p.id; checkAchievements(); persist(); sfx.win(); renderShop(); });
   else {
     mk(eq ? '讓牠休息' : '帶牠一起玩', eq ? 'ghost' : 'alt', false, () => { save.pet = eq ? null : p.id; persist(); sfx.coin(); renderShop(); });
-    if (lvl < MAX_LEVEL) { const c = feedCost(p, lvl); mk(`餵食 💰${c}`, '', save.coins < c, () => { save.coins -= c; save.pets[p.id] = lvl + 1; persist(); sfx.win(); emojiToast(p.icon); renderShop(); }); }
+    if (lvl < MAX_LEVEL) { const c = feedCost(p, lvl); mk(`餵食 💰${c}`, '', save.coins < c, () => { save.coins -= c; save.pets[p.id] = lvl + 1; checkAchievements(); persist(); sfx.win(); emojiToast(p.icon); renderShop(); }); }
   }
   det.appendChild(card);
 }
@@ -4444,7 +4534,7 @@ function startZen() {
 function zenEnd() {
   state = 'over';
   const rec = G.score > (save.zenBest || 0);
-  recordScore();
+  recordScore(); checkAchievements();
   persist();
   $('over-title').textContent = '🧘 禪模式結束';
   setResult('🧘 禪模式 90 秒', G.score, save.zenBest);
@@ -4553,7 +4643,7 @@ async function claimWeekPrize() {
     b.forEach(d => { const p = d.data(); rows[p.code] = Math.max(rows[p.code] || 0, p.pwbest || 0); });
     const rank = Object.entries(rows).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]).findIndex(([c]) => c === friendCode());
     save.weekPrize = lw;
-    if (rank >= 0 && rank < 3) { save.coins += WEEK_PRIZE[rank]; toast(`🏆 上週排行榜第 ${rank + 1} 名！獎勵 +${WEEK_PRIZE[rank]} 💰`); sfx.win(); }
+    if (rank >= 0 && rank < 3) { save.coins += WEEK_PRIZE[rank]; toast(`🏆 上週排行榜第 ${rank + 1} 名！獎勵 +${WEEK_PRIZE[rank]} 💰`); sfx.win(); track('weekTop'); }
     persist();
   } catch (e) {}
 }
@@ -4642,7 +4732,7 @@ async function addFriend() {
   try {
     const found = await findProfiles([code]);
     if (!found[code]) return (msg.textContent = '❌ 找不到這個好友碼，請對方先打開一次遊戲的好友頁');
-    save.friends.push(code); friendsCache[code] = found[code]; persist();
+    save.friends.push(code); friendsCache[code] = found[code]; checkAchievements(); persist();
     $('friend-input').value = ''; msg.textContent = `✅ 已加入好友：${found[code].name}`; sfx.coin();
     renderFriends();
   } catch (e) { msg.textContent = '⚠️ 查詢失敗，請檢查網路'; }
@@ -4654,7 +4744,7 @@ async function sendGift(code) {
   const markSent = () => { save.giftSent = save.giftSent || {}; save.giftSent[code] = day; persist(); };
   try {
     await setDoc(ref, { from: me, fromName: myName(), to: code, day, at: serverTimestamp() });
-    markSent(); $('friend-msg').textContent = '🎁 禮物已送出！'; sfx.coin();
+    markSent(); track('gift'); $('friend-msg').textContent = '🎁 禮物已送出！'; sfx.coin();
   } catch (e) {
     // 送不出去：先看是不是今天已經送過（禮物還在），不是的話就是網路或登記問題
     let sent = false; try { sent = (await getDoc(ref)).exists(); } catch (e2) {}
@@ -4670,13 +4760,14 @@ async function claimGifts() {
   $('friend-msg').textContent = `✅ 領取 ${n} 份禮物，+${n * GIFT_COINS} 💰`; sfx.win(); renderFriends();
 }
 
-// ----- 挑戰賽：60 秒，雙方的水果出現順序完全一樣，比分數 -----
-const CHAL_TIME = 60;
+// ----- 挑戰賽：用無盡模式的玩法（Boss 一直來、3 顆愛心、越來越難），愛心用完比分數 -----
+// 雙方用同一組亂數開局（水果、Boss 攻擊各一組），一律基本小刀、不帶寵物和強化；之後誰打得快、打得準就會開始拉開差距
 function startChallenge(c) {
   audio();
   c.seed = c.seed || (crypto.getRandomValues(new Uint32Array(1))[0] % 2147483646) + 1;
   curStage = 0; newGame(0);
-  G.chal = c; G.rand = rng(c.seed); G.hearts = 3; G.nextBoss = Infinity; G.ev = null; G.pet = null; G.tut = null;
+  G.endless = true; G.chal = c; G.rand = rng(c.seed); G.rand2 = rng((c.seed * 48271) % 2147483647 || 1);
+  G.hearts = START_HEARTS; G.ev = null; G.pet = null; G.tut = null;
   state = 'play'; show(null); track('game'); updateHUD();
 }
 async function challengeEnd() {
@@ -4693,7 +4784,7 @@ async function challengeEnd() {
       const { doc, updateDoc } = CLOUD.api;
       await updateDoc(doc(CLOUD.db, 'challenges', c.id), { reply: score, replyName: myName() });
       txt = score > c.theirScore ? `🏆 你贏了！${c.toName} ${c.theirScore} 分` : score === c.theirScore ? `🤝 平手！都是 ${score} 分` : `😢 差一點！${c.toName} ${c.theirScore} 分`;
-      if (score > c.theirScore) sfx.win();
+      if (score > c.theirScore) { sfx.win(); track('chalWin'); }
     }
   } catch (e) { txt = '⚠️ 結果上傳失敗，請檢查網路'; }
   $('chal-text').textContent = txt;

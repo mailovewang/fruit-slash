@@ -122,16 +122,16 @@ service cloud.firestore {
     // 挑戰賽：建立時還沒有對手分數；對手只能填一次自己的分數
     match /challenges/{id} {
       allow read: if authed();
-      // 只能用自己的好友碼發挑戰；60 秒挑戰分數上限 1000
+      // 只能用自己的好友碼發挑戰；挑戰是無盡模式玩法，分數上限 50000
       allow create: if authed() && notBanned() && request.resource.data.from == myCode()
         && request.resource.data.keys().hasOnly(['from', 'fromName', 'to', 'seed', 'score', 'reply', 'replyName', 'at'])
         && fcode(request.resource.data.from) && fcode(request.resource.data.to) && shortStr(request.resource.data.fromName, 40)
-        && num(request.resource.data.seed, 2147483647) && num(request.resource.data.score, 1000)
+        && num(request.resource.data.seed, 2147483647) && num(request.resource.data.score, 50000)
         && request.resource.data.reply == null && request.resource.data.replyName == null && request.resource.data.at == request.time;
       // 只有被挑戰的人本人可以填自己的分數
       allow update: if authed() && resource.data.reply == null && resource.data.to == myCode()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'replyName'])
-        && num(request.resource.data.reply, 1000) && shortStr(request.resource.data.replyName, 40);
+        && num(request.resource.data.reply, 50000) && shortStr(request.resource.data.replyName, 40);
       allow delete: if isAdmin();
     }
   }
