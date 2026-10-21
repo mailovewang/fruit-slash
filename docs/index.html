@@ -662,9 +662,14 @@ const BOSS_HP = [25, 32, 40, 48, 62];   // 每關第 1～5 隻 Boss 的基礎血
 const BOSS_AT = [30, 85, 145, 210, 285]; // 分數到這裡出現第 n 隻 Boss（會依關卡難度調整）
 
 const MAX_LEVEL = 5, MAX_HEARTS = 5, START_HEARTS = 3;
-const VERSION = '2.0.0'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
+const VERSION = '2.0.1'; // 每次更新就把這個數字加一點，並同時改 docs/version.json，舊版遊戲才會知道有新版
 // 更新內容：玩家更新後第一次打開遊戲會看到這個版本的清單（每次更新就在最上面加一筆）
 const CHANGELOG = {
+  '2.0.1': [
+    '🐾 寵物有特效了：貓咪會撲過去抓水果、兔兔會跳過去接住、貓熊的大熊掌從天上拍向 Boss、狗狗會噴金幣、小雞會開心跳',
+    '✨ 寵物身邊有光環，等級越高越亮；滿級還會一直閃閃發亮',
+    '🔊 切水果的聲音重做：更像真的切開多汁的水果，用力揮刀也會有風聲',
+  ],
   '2.0.0': [
     '🐾 新增寵物：小貓咪、小狗狗、小雞、小兔兔、貓熊，每隻幫忙的方式都不一樣，還可以餵食升級',
     '🎰 新增扭蛋：抽 6 種扭蛋限定刀光，和 4 把「雙屬性」扭蛋神刀（月影刀、熔岩雷刀、幸運草刀、花吹雪）',
@@ -1189,9 +1194,34 @@ function tone(f1, f2, dur, vol, type = 'sine', delay = 0) {
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur);
 }
-let lastSliceSfx = 0;
+let lastSliceSfx = 0, lastSwingSfx = 0;
+// 雜訊＋會滑動的濾波器（頻率從 f0 滑到 f1），用來做刀聲、切開聲、風聲
+function sweepNoise(dur, f0, f1, q, vol, type = 'bandpass', delay = 0) {
+  const t = actx.currentTime + delay, f = actx.createBiquadFilter();
+  f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  f.connect(actx.destination);
+  const s = actx.createBufferSource(); s.buffer = noiseBuffer();
+  const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.012, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(g).connect(f); s.start(t, Math.random() * (2 - dur)); s.stop(t + dur + 0.02);
+}
 const sfx = {
-  slice() { const n = performance.now(); if (n - lastSliceSfx < 40) return; lastSliceSfx = n; noise(0.12, 2500, 0.25); tone(900 + Math.random() * 300, 300, 0.08, 0.05, 'triangle'); },
+  // 切開水果：刀刃擦過的「唰」＋多汁的「啾」（濾波器往下滑的雜訊）＋悶悶的果肉「噗」＋幾滴果汁「滴」
+  slice() {
+    const n = performance.now(); if (n - lastSliceSfx < 45) return; lastSliceSfx = n;
+    if (!actx || !settings().sfx) return;
+    const p = 0.85 + Math.random() * 0.3; // 每次音高稍微不同，連續切才不會像機關槍
+    sweepNoise(0.035, 6000, 4000, 0.7, 0.10, 'highpass');
+    sweepNoise(0.11, 1900 * p, 420 * p, 1.6, 0.42, 'bandpass', 0.01);
+    tone(170 * p, 60, 0.09, 0.22, 'sine', 0.01);
+    for (let i = 0; i < 2; i++) tone(1100 + Math.random() * 600, 1800 + Math.random() * 500, 0.03, 0.025, 'sine', 0.05 + Math.random() * 0.09);
+  },
+  // 用力揮刀（沒切到也有）：風聲「咻」，揮越快越大聲
+  swing(speed) {
+    const n = performance.now(); if (n - lastSwingSfx < 160) return; lastSwingSfx = n;
+    if (!actx || !settings().sfx) return;
+    const v = Math.min(1, (speed - 1) / 3);
+    sweepNoise(0.16, 500, 2600, 1.2, 0.06 + 0.1 * v, 'bandpass');
+  },
   bomb() { noise(0.6, 400, 0.7, 'lowpass'); tone(120, 40, 0.5, 0.4); },
   hit() { noise(0.1, 800, 0.3, 'bandpass'); tone(200, 90, 0.12, 0.2, 'square'); },
   coin() { tone(990, 1480, 0.12, 0.1, 'square'); },
@@ -1293,9 +1323,11 @@ function pickKind(diff) {
   const r = R(), bomb = G.tut && !G.tut.cut ? 0 : (G.boss ? 0.05 : 0.07 + 0.11 * diff) * G.st.diff * (1 - 0.08 * pl('bomb'));
   const chick = G.pet && G.pet.id === 'chick' ? G.pet.lvl : 0; // 小雞：金星、愛心更常出現
   const star = 0.03 + 0.012 * pl('star') + 0.01 * chick, heart = 0.015 + 0.01 * pl('heart') + 0.005 * chick;
+  // 小雞帶來的金星、愛心：小雞開心跳一下、灑羽毛
+  const chickFx = () => { if (!chick) return; const pp = petPos(); petAct('happy'); text(pp.x + S * 0.05, pp.y - S * 0.1, '嗶！', '#fff3a0', 0.045, 0.7); emojiBurst(pp.x, pp.y, '✨', 3, S * 0.025, 0.3); };
   if (r < bomb) return 'bomb';
-  if (r < bomb + star) return 'star';
-  if (r < bomb + star + heart && (G.chal || G.hearts < MAX_HEARTS)) return 'heart';
+  if (r < bomb + star) { chickFx(); return 'star'; }
+  if (r < bomb + star + heart && (G.chal || G.hearts < MAX_HEARTS)) { chickFx(); return 'heart'; }
   return 'fruit';
 }
 
@@ -1380,6 +1412,11 @@ function addCoins(n) {
   const dog = G.pet && G.pet.id === 'dog' ? 0.1 + 0.05 * G.pet.lvl : 0; // 小狗狗：金幣加成
   const v = n * (1 + 0.08 * perkLvl('coin') + dog) + G.coinFrac, w = Math.floor(v + 1e-9);
   G.coinFrac = v - w; save.coins += w; G.coinsEarned += w;
+  // 小狗狗幫忙多賺的金幣：從牠身上跳出一枚金幣（不要太頻繁）
+  if (dog && w > 0 && G.time - (G.pet.coinFx || -9) > 0.6) {
+    G.pet.coinFx = G.time; const pp = petPos(); petAct('happy');
+    addPart({ x: pp.x, y: pp.y - S * 0.05, vx: (Math.random() - 0.5) * S * 0.2, vy: -S * 0.6, life: 0.8, max: 0.8, e: '🪙', size: S * 0.03, g: 0.8, rot: 0 });
+  }
   if (w > 0) track('coins', w);
   return w;
 }
@@ -1600,8 +1637,8 @@ function missFruit(o) {
   if (G.tut && !G.tut.miss) { G.tut.miss = true; tutSay('❤️ 水果掉到下面會扣一顆愛心，愛心用完就結束', 4); }
   // 小兔兔：幫忙接住，不扣愛心
   if (G.pet && G.pet.id === 'bunny' && G.pet.saves > 0 && !G.chal) {
-    G.pet.saves--; const pp = petPos();
-    text(Math.max(60, Math.min(W - 60, o.x)), H - S * 0.12, '🐰 接住了！', '#ffc8dd', 0.06, 1.2); emojiBurst(pp.x, pp.y, '💕', 3, S * 0.03);
+    G.pet.saves--;
+    petAct('catch', { tx: Math.max(60, Math.min(W - 60, o.x)), ty: H - S * 0.1 }); // 小兔兔跳過去接住
     return;
   }
   const x = Math.max(30, Math.min(W - 30, o.x));
@@ -1613,6 +1650,7 @@ function missFruit(o) {
 function handleSegment(ax, ay, bx, by, dtms) {
   const len = Math.hypot(bx - ax, by - ay);
   if (len < 2 || len / dtms < 0.2) return;
+  if (len / dtms > 1.2) sfx.swing(len / dtms); // 揮得夠快就有風聲
   const ang = Math.atan2(by - ay, bx - ax);
   const nx = -Math.sin(ang), ny = Math.cos(ang), hm = hitMul();
   for (const o of G.objs) {
@@ -3934,31 +3972,89 @@ function renderPets(list, det) {
 }
 const emojiToast = icon => toast(`${icon} 吃飽了，長大了！`);
 // 遊戲中的寵物：newGame 時帶出場
-function petForGame() { const id = save.pet, lvl = petLvl(id); return id && lvl ? { id, lvl, t: id === 'cat' ? 9 - lvl : 6 - 0.6 * lvl, saves: lvl >= 4 ? 2 : 1, bob: 0 } : null; }
+function petForGame() { const id = save.pet, lvl = petLvl(id); return id && lvl ? { id, lvl, t: id === 'cat' ? 9 - lvl : 6 - 0.6 * lvl, saves: lvl >= 4 ? 2 : 1, bob: 0, act: null, happy: 0 } : null; }
 const petPos = () => ({ x: S * 0.1, y: H - S * 0.1 });
+// 每隻寵物的代表色（光環、粒子用）
+const PET_COLOR = { cat: '#ffd6a5', dog: '#ffd166', chick: '#fff3a0', bunny: '#ffc8dd', panda: '#e0e0e0' };
+// 寵物做動作：cat 撲過去、bunny 跳過去接、panda 從天而降的大熊掌、dog/chick 開心跳一下
+function petAct(kind, data = {}) {
+  const p = G.pet; if (!p) return;
+  const dur = { pounce: 0.55, catch: 0.6, slam: 0.5 }[kind] || 0;
+  if (dur) p.act = Object.assign({ kind, t: 0, dur, hit: false }, data);
+  else p.happy = 0.5; // 跳一下
+}
 function updatePet(dt) {
-  const p = G.pet; if (!p || G.done || G.overT > 0) return;
-  p.bob += dt;
+  const p = G.pet; if (!p) return;
+  p.bob += dt; p.happy = Math.max(0, p.happy - dt);
+  // 等級 5：身邊一直有閃亮的小星星
+  if (p.lvl >= MAX_LEVEL && Math.random() < dt * 3) { const pp = petPos(); addPart({ x: pp.x + (Math.random() - 0.5) * S * 0.09, y: pp.y - S * 0.03 + (Math.random() - 0.5) * S * 0.06, vx: 0, vy: -S * 0.05, life: 0.7, max: 0.7, e: '✨', size: S * 0.022, g: 0, rot: 0 }); }
+  const a = p.act;
+  if (a) {
+    a.t += dt;
+    if (a.kind === 'pounce' && a.target) {
+      if (!a.target.dead) { a.tx = a.target.x; a.ty = a.target.y; }
+      if (!a.hit && a.t >= a.dur * 0.5) {
+        a.hit = true;
+        // 三道爪痕＋腳印
+        for (let i = -1; i <= 1; i++) slash(a.tx - S * 0.06 + i * S * 0.025, a.ty - S * 0.06, a.tx + S * 0.03 + i * S * 0.025, a.ty + S * 0.06, '#ffd6a5', S * 0.008, 0.35, true);
+        emojiBurst(a.tx, a.ty, '🐾', 4, S * 0.03); ring(a.tx, a.ty, S * 0.12, '#ffd6a5', 0.3);
+        if (!a.target.dead) hitObj(a.target, -1.2, true);
+        tone(1300, 700, 0.08, 0.06, 'triangle'); // 喵～的短音
+      }
+    } else if (a.kind === 'catch' && !a.hit && a.t >= a.dur * 0.5) {
+      a.hit = true; emojiBurst(a.tx, a.ty, '💕', 5, S * 0.035); ring(a.tx, a.ty, S * 0.15, '#ffc8dd', 0.4);
+      text(a.tx, a.ty - S * 0.08, '🐰 接住了！', '#ffc8dd', 0.06, 1.2); sfx.coin();
+    } else if (a.kind === 'slam' && !a.hit && a.t >= a.dur * 0.6) {
+      a.hit = true;
+      const b = G.boss;
+      if (b && !b.fin) {
+        ring(b.x, b.y, b.r * 1.6, '#ffffff', 0.4, 0.04); burst(b.x, b.y, 'dot', 14, ['#ffffff', '#cccccc', '#222222'], 0.8, 0.008, 0.5);
+        text(b.x, b.y - b.r * 1.2, '啪！', '#ffffff', 0.09, 0.8); G.shake = Math.max(G.shake, 0.5); sfx.hit(); buzz(30);
+        damageBoss(1 + 0.5 * p.lvl);
+      }
+    }
+    if (a.t >= a.dur) p.act = null;
+  }
+  if (G.done || G.overT > 0 || p.act) return;
   if (p.id === 'cat') {
     p.t -= dt;
     if (p.t <= 0) {
-      const cands = G.objs.filter(o => !o.dead && o.kind !== 'bomb' && o.y < H * 0.85);
-      if (cands.length) {
-        const o = cands[Math.random() * cands.length | 0], pp = petPos();
-        slash(pp.x, pp.y, o.x, o.y, '#ffd6a5', S * 0.01, 0.3, true); emojiBurst(o.x, o.y, '🐾', 3, S * 0.03);
-        hitObj(o, Math.atan2(o.y - pp.y, o.x - pp.x), true); p.t = 9 - p.lvl;
-      } else p.t = 0.5;
+      const cands = G.objs.filter(o => !o.dead && o.kind !== 'bomb' && o.y < H * 0.85 && o.y > H * 0.1);
+      if (cands.length) { const o = cands[Math.random() * cands.length | 0]; petAct('pounce', { target: o, tx: o.x, ty: o.y }); p.t = 9 - p.lvl; }
+      else p.t = 0.5;
     }
   } else if (p.id === 'panda' && G.boss && !G.boss.fin && !G.boss.enter) {
     p.t -= dt;
-    if (p.t <= 0) { p.t = 6 - 0.6 * p.lvl; emojiBurst(G.boss.x, G.boss.y, '🐾', 4, S * 0.04); damageBoss(1 + 0.5 * p.lvl); }
+    if (p.t <= 0) { p.t = 6 - 0.6 * p.lvl; petAct('slam'); }
   }
 }
 function drawPet(now) {
   const p = G.pet; if (!p) return;
-  const pp = petPos(), hop = Math.abs(Math.sin(now / 260)) * S * 0.015;
-  ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(pp.x, pp.y + S * 0.04, S * 0.035, S * 0.01, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
-  drawSprite(PETS.find(x => x.id === p.id).icon, S * 0.075, pp.x, pp.y - hop);
+  const home = petPos(), info = PETS.find(x => x.id === p.id), col = PET_COLOR[p.id];
+  let x = home.x, y = home.y - Math.abs(Math.sin(now / 260)) * S * 0.015 - Math.sin(Math.min(1, p.happy * 2) * Math.PI) * S * 0.05;
+  let size = S * 0.075, rot = Math.sin(now / 400) * 0.08;
+  const a = p.act;
+  // 撲過去／跳過去：沿著弧線飛到目標再飛回來
+  if (a && (a.kind === 'pounce' || a.kind === 'catch')) {
+    const k = a.t / a.dur, u = k < 0.5 ? k * 2 : 2 - k * 2, e = u * u * (3 - 2 * u);
+    x = home.x + (a.tx - home.x) * e; y = home.y + (a.ty - home.y) * e - Math.sin(e * Math.PI) * S * 0.12;
+    size *= 1 + 0.25 * Math.sin(e * Math.PI); rot = (a.tx > home.x ? 1 : -1) * 0.4 * Math.sin(e * Math.PI);
+    if (Math.random() < 0.6) addPart({ x, y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: col, size: S * 0.008, g: 0 });
+  }
+  // 光環：等級越高越亮越大
+  const glowR = S * (0.05 + 0.008 * p.lvl), pulse = 1 + Math.sin(now / 300) * 0.08;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.18 + 0.05 * p.lvl;
+  ctx.drawImage(glowSprite(col, 'rgba(0,0,0,0)'), x - glowR * pulse, y - glowR * pulse, glowR * 2 * pulse, glowR * 2 * pulse); ctx.restore();
+  ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(home.x, home.y + S * 0.04, S * 0.035, S * 0.01, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  drawSprite(info.icon, size, x, y, rot);
+  // 貓熊：大熊掌從天上拍向 Boss
+  if (a && a.kind === 'slam' && G.boss) {
+    const k = Math.min(1, a.t / (a.dur * 0.6)), b = G.boss, px = b.x, py = -S * 0.2 + (b.y - b.r * 0.2 + S * 0.2) * k * k;
+    const fade = a.t > a.dur * 0.8 ? 1 - (a.t - a.dur * 0.8) / (a.dur * 0.2) : 1, ps = S * (0.18 + 0.1 * k);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7 * fade; // 白色光暈，暗的關卡也看得清楚
+    ctx.drawImage(glowSprite('#ffffff', 'rgba(255,255,255,0)'), px - ps, py - ps, ps * 2, ps * 2); ctx.restore();
+    drawSprite('🐾', ps, px, py, 0.3, fade);
+  }
 }
 
 // ===== 限時活動：依日期自動開始／結束；管理員也可以在後台用雲端開關提早開、延長或關閉 =====
